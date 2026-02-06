@@ -3,93 +3,471 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <!-- Segurança: Content Security Policy restringe fontes de script apenas para este domínio e o CDN confiável -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <title>Geometric Survivor 3D</title>
+    <title>NEON PROTOCOL :: Geometric Survivor</title>
     
-    <!-- Importando Three.js com atributo crossorigin para segurança -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
         :root {
-            --accent: #e94560;
-            --ui-bg: rgba(22, 33, 62, 0.9);
-            --font-main: 'Courier New', Courier, monospace;
+            --neon-pink: #ff006e;
+            --neon-cyan: #00f5ff;
+            --neon-purple: #b967ff;
+            --neon-yellow: #fffb00;
+            --neon-green: #05ffa1;
+            --dark-bg: #0a0e27;
+            --darker-bg: #050810;
+            --ui-bg: rgba(10, 14, 39, 0.95);
+            --border-glow: rgba(0, 245, 255, 0.6);
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body { 
             margin: 0; 
             overflow: hidden; 
-            background-color: #050510; 
-            color: white; 
-            font-family: var(--font-main); 
-            user-select: none; /* Previne seleção de texto acidental */
+            background: linear-gradient(135deg, var(--darker-bg) 0%, var(--dark-bg) 100%);
+            color: var(--neon-cyan); 
+            font-family: 'Orbitron', 'Courier New', monospace;
+            user-select: none;
             -webkit-user-select: none;
         }
         
-        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; }
+        #game-container { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            outline: none;
+            filter: contrast(1.1) saturate(1.2);
+        }
 
-        /* UI Layer */
-        .ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        /* Scanline Effect */
+        #game-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 245, 255, 0.03) 0px,
+                transparent 1px,
+                transparent 2px,
+                rgba(0, 245, 255, 0.03) 3px
+            );
             pointer-events: none;
-            display: flex; justify-content: center; align-items: center;
+            z-index: 100;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+
+        /* Vignette Effect */
+        #game-container::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .ui-layer {
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            pointer-events: none;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
             z-index: 10;
         }
 
-        /* HUD */
+        /* Enhanced HUD */
         #hud {
-            position: absolute; top: 20px; left: 20px;
-            pointer-events: none; text-align: left;
-            text-shadow: 0 0 5px #000;
+            position: absolute; 
+            top: 30px; 
+            left: 30px;
+            pointer-events: none;
+            text-align: left;
             z-index: 5;
+            background: rgba(10, 14, 39, 0.7);
+            padding: 20px;
+            border: 2px solid var(--border-glow);
+            border-radius: 8px;
+            box-shadow: 
+                0 0 20px rgba(0, 245, 255, 0.3),
+                inset 0 0 20px rgba(0, 245, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .hud-label {
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            color: var(--neon-cyan);
+            text-shadow: 
+                0 0 10px var(--neon-cyan),
+                0 0 20px var(--neon-cyan);
         }
 
         .bar-container {
-            width: 200px; height: 15px; background: rgba(0,0,0,0.5);
-            margin-bottom: 5px; border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 4px; overflow: hidden;
+            width: 220px; 
+            height: 18px; 
+            background: rgba(0, 0, 0, 0.8);
+            margin-bottom: 15px; 
+            border: 2px solid rgba(0, 245, 255, 0.4);
+            border-radius: 4px; 
+            overflow: hidden;
+            position: relative;
+            box-shadow: 
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(0, 245, 255, 0.2);
         }
-        .bar-fill { height: 100%; transition: width 0.2s ease-out; box-shadow: 0 0 10px currentColor; }
-        #hp-bar { background-color: #e94560; color: #e94560; width: 100%; }
-        #xp-bar { background-color: #fce38a; color: #fce38a; width: 0%; }
 
-        /* Menus */
+        .bar-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 40%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.2), transparent);
+            pointer-events: none;
+        }
+
+        .bar-fill { 
+            height: 100%; 
+            transition: width 0.3s ease-out;
+            position: relative;
+            box-shadow: 
+                0 0 20px currentColor,
+                inset 0 0 10px rgba(255,255,255,0.3);
+        }
+
+        #hp-bar { 
+            background: linear-gradient(90deg, #ff006e, #ff4d94);
+            color: #ff006e;
+            width: 100%;
+            animation: pulse-hp 2s ease-in-out infinite;
+        }
+
+        #xp-bar { 
+            background: linear-gradient(90deg, #fffb00, #ffd000);
+            color: #fffb00;
+            width: 0%;
+            animation: pulse-xp 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-hp {
+            0%, 100% { box-shadow: 0 0 20px #ff006e, inset 0 0 10px rgba(255,255,255,0.3); }
+            50% { box-shadow: 0 0 30px #ff006e, inset 0 0 15px rgba(255,255,255,0.4); }
+        }
+
+        @keyframes pulse-xp {
+            0%, 100% { box-shadow: 0 0 15px #fffb00, inset 0 0 10px rgba(255,255,255,0.3); }
+            50% { box-shadow: 0 0 25px #fffb00, inset 0 0 15px rgba(255,255,255,0.4); }
+        }
+
+        .stat-value {
+            color: white;
+            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+            font-weight: 700;
+        }
+
+        #score-text {
+            margin-top: 10px;
+            font-size: 1.3rem;
+            font-weight: 900;
+            color: var(--neon-yellow);
+            text-shadow: 
+                0 0 10px var(--neon-yellow),
+                0 0 20px var(--neon-yellow),
+                0 0 30px var(--neon-yellow);
+            animation: glow-score 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow-score {
+            from { text-shadow: 0 0 10px var(--neon-yellow), 0 0 20px var(--neon-yellow); }
+            to { text-shadow: 0 0 15px var(--neon-yellow), 0 0 30px var(--neon-yellow), 0 0 40px var(--neon-yellow); }
+        }
+
+        /* Modal Enhancements */
         .modal {
-            background: var(--ui-bg); padding: 40px;
-            border: 2px solid var(--accent);
-            text-align: center; pointer-events: auto;
-            display: none; flex-direction: column; gap: 20px;
-            box-shadow: 0 0 50px rgba(233, 69, 96, 0.2);
-            backdrop-filter: blur(10px);
-            border-radius: 10px;
-            min-width: 300px;
+            background: var(--ui-bg);
+            padding: 50px;
+            border: 3px solid var(--border-glow);
+            text-align: center;
+            pointer-events: auto;
+            display: none;
+            flex-direction: column;
+            gap: 25px;
+            box-shadow: 
+                0 0 60px rgba(0, 245, 255, 0.4),
+                inset 0 0 30px rgba(0, 245, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            min-width: 400px;
+            position: relative;
+            overflow: hidden;
         }
-        .modal.active { display: flex; animation: fadeIn 0.3s ease-out; }
 
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .modal::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(0, 245, 255, 0.03) 10px,
+                rgba(0, 245, 255, 0.03) 20px
+            );
+            animation: bg-scroll 20s linear infinite;
+            pointer-events: none;
+        }
 
-        h1 { margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 3px; font-size: 2rem; }
-        p { color: #ccc; line-height: 1.5; }
+        @keyframes bg-scroll {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .modal.active { 
+            display: flex; 
+            animation: modalFadeIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes modalFadeIn { 
+            from { 
+                opacity: 0; 
+                transform: scale(0.8) translateY(-50px);
+                filter: blur(10px);
+            } 
+            to { 
+                opacity: 1; 
+                transform: scale(1) translateY(0);
+                filter: blur(0);
+            } 
+        }
+
+        h1 { 
+            margin: 0; 
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            font-size: 2.5rem;
+            font-weight: 900;
+            text-shadow: 
+                0 0 10px var(--neon-cyan),
+                0 0 20px var(--neon-cyan),
+                0 0 40px var(--neon-cyan),
+                0 0 80px rgba(0, 245, 255, 0.5);
+            animation: title-glow 2s ease-in-out infinite alternate;
+            position: relative;
+            z-index: 1;
+        }
+
+        @keyframes title-glow {
+            from { 
+                text-shadow: 
+                    0 0 10px var(--neon-cyan),
+                    0 0 20px var(--neon-cyan),
+                    0 0 40px var(--neon-cyan);
+            }
+            to { 
+                text-shadow: 
+                    0 0 20px var(--neon-cyan),
+                    0 0 30px var(--neon-cyan),
+                    0 0 60px var(--neon-cyan),
+                    0 0 100px rgba(0, 245, 255, 0.6);
+            }
+        }
+
+        .subtitle {
+            color: var(--neon-purple);
+            font-size: 1rem;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px var(--neon-purple);
+            position: relative;
+            z-index: 1;
+        }
+
+        p { 
+            color: #ccc;
+            line-height: 1.8;
+            position: relative;
+            z-index: 1;
+        }
+
+        .controls-hint {
+            font-size: 0.95rem;
+            color: var(--neon-green);
+            padding: 15px;
+            background: rgba(5, 255, 161, 0.1);
+            border: 1px solid rgba(5, 255, 161, 0.3);
+            border-radius: 8px;
+            text-shadow: 0 0 5px var(--neon-green);
+        }
 
         button {
-            background: transparent; border: 1px solid var(--accent); color: white;
-            padding: 15px 40px; font-family: inherit; font-size: 1.2rem; cursor: pointer;
-            transition: all 0.2s; text-transform: uppercase; font-weight: bold;
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(185, 103, 255, 0.1));
+            border: 2px solid var(--neon-cyan);
+            color: white;
+            padding: 18px 45px;
+            font-family: inherit;
+            font-size: 1.3rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            text-transform: uppercase;
+            font-weight: 900;
+            letter-spacing: 3px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            z-index: 1;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
         }
-        button:hover { background: var(--accent); box-shadow: 0 0 20px var(--accent); color: #fff; }
-        button:active { transform: scale(0.98); }
 
-        .upgrade-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; width: 100%; max-width: 600px; }
-        .upgrade-card {
-            border: 1px solid rgba(255,255,255,0.2); padding: 15px; cursor: pointer;
-            background: rgba(0,0,0,0.3); transition: 0.3s;
-            display: flex; flex-direction: column; justify-content: center;
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 245, 255, 0.4), transparent);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
         }
-        .upgrade-card:hover { background: var(--accent); transform: translateY(-5px); border-color: #fff; }
-        .upgrade-card h3 { color: #fce38a; margin: 0 0 8px 0; font-size: 1rem; }
-        .upgrade-card p { font-size: 0.8rem; margin: 0; color: #ddd; }
+
+        button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        button:hover { 
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.3), rgba(185, 103, 255, 0.3));
+            box-shadow: 
+                0 0 30px var(--neon-cyan),
+                0 0 60px rgba(0, 245, 255, 0.4),
+                inset 0 0 20px rgba(0, 245, 255, 0.2);
+            transform: translateY(-3px) scale(1.05);
+            border-color: white;
+        }
+
+        button:active { 
+            transform: translateY(-1px) scale(1.02);
+        }
+
+        .upgrade-grid { 
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 700px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upgrade-card {
+            border: 2px solid rgba(185, 103, 255, 0.4);
+            padding: 20px;
+            cursor: pointer;
+            background: linear-gradient(135deg, rgba(185, 103, 255, 0.1), rgba(255, 0, 110, 0.1));
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+        }
+
+        .upgrade-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(185, 103, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s;
+        }
+
+        .upgrade-card:hover::before {
+            transform: rotate(90deg) scale(1.5);
+        }
+
+        .upgrade-card:hover { 
+            background: linear-gradient(135deg, rgba(185, 103, 255, 0.3), rgba(255, 0, 110, 0.3));
+            transform: translateY(-8px) scale(1.05);
+            border-color: var(--neon-pink);
+            box-shadow: 
+                0 0 40px rgba(185, 103, 255, 0.6),
+                0 10px 30px rgba(0, 0, 0, 0.5),
+                inset 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .upgrade-card h3 { 
+            color: var(--neon-yellow);
+            margin: 0 0 12px 0;
+            font-size: 1.1rem;
+            font-weight: 900;
+            text-shadow: 
+                0 0 10px var(--neon-yellow),
+                0 0 20px var(--neon-yellow);
+            position: relative;
+            z-index: 1;
+        }
+
+        .upgrade-card p { 
+            font-size: 0.85rem;
+            margin: 0;
+            color: #ddd;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Glitch Effect for Game Over */
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        #game-over-screen h1 {
+            color: var(--neon-pink);
+            text-shadow: 
+                0 0 10px var(--neon-pink),
+                0 0 20px var(--neon-pink),
+                0 0 40px var(--neon-pink);
+            animation: glitch 0.3s infinite, title-glow 2s ease-in-out infinite alternate;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .modal { min-width: 300px; padding: 30px; }
+            h1 { font-size: 2rem; }
+            #hud { top: 15px; left: 15px; padding: 15px; }
+            .bar-container { width: 180px; }
+        }
     </style>
 </head>
 <body>
@@ -97,51 +475,55 @@
 <div id="game-container"></div>
 
 <div id="hud">
-    <div style="font-weight: bold;">HP <span id="hp-text">100/100</span></div>
+    <div class="hud-label">HULL INTEGRITY</div>
+    <div style="font-weight: 700; margin-bottom: 5px;"><span id="hp-text" class="stat-value">100/100</span></div>
     <div class="bar-container"><div id="hp-bar" class="bar-fill"></div></div>
-    <div style="font-weight: bold; margin-top: 10px;">LVL <span id="lvl-text">1</span></div>
+    
+    <div class="hud-label">CORE LEVEL</div>
+    <div style="font-weight: 700; margin-bottom: 5px;">LVL <span id="lvl-text" class="stat-value">1</span></div>
     <div class="bar-container"><div id="xp-bar" class="bar-fill"></div></div>
-    <div id="score-text" style="margin-top: 10px;">SCORE: 0</div>
+    
+    <div id="score-text">KILLS: 0</div>
 </div>
 
 <div class="ui-layer">
     <div id="start-screen" class="modal active">
-        <h1>NEON SURVIVOR 3D</h1>
-        <p>Protocolo de Segurança Ativado.<br>Elimine as anomalias geométricas.</p>
-        <p style="font-size: 0.9em; color: #888;">[WASD] Mover | [MOUSE] Mirar/Atirar</p>
-        <button id="btn-start">INICIAR SISTEMA</button>
+        <h1>NEON PROTOCOL</h1>
+        <div class="subtitle">GEOMETRIC SURVIVOR</div>
+        <p>Sistema de defesa ativado.<br>Elimine as anomalias geométricas hostis.</p>
+        <div class="controls-hint">[WASD] MOVIMENTO | [MOUSE] MIRA/DISPARO</div>
+        <button id="btn-start">INICIAR MISSÃO</button>
     </div>
 
     <div id="upgrade-screen" class="modal">
-        <h1>UPGRADE DISPONÍVEL</h1>
+        <h1>UPGRADE CORE</h1>
+        <div class="subtitle">SELECIONE MELHORIA</div>
         <div class="upgrade-grid" id="upgrade-options"></div>
     </div>
 
     <div id="game-over-screen" class="modal">
-        <h1>SINAL PERDIDO</h1>
-        <p>Eficiência do combate: <span id="final-score">0</span> pts</p>
-        <button id="btn-restart">REINICIAR</button>
+        <h1>CONEXÃO PERDIDA</h1>
+        <div class="subtitle">SISTEMA COMPROMETIDO</div>
+        <p style="font-size: 1.4rem; color: var(--neon-yellow);">Eliminações: <span id="final-score">0</span></p>
+        <button id="btn-restart">REINICIAR PROTOCOLO</button>
     </div>
 </div>
 
 <script>
-/**
- * GEOMETRIC SURVIVOR 3D - Optimized Core
- * Encapsulado em IIFE para prevenir acesso global (Anti-Console Cheating básico)
- */
 (function() {
-    "use strict"; // Força boas práticas de JS
+    "use strict";
 
-    // --- CONSTANTES IMUTÁVEIS (Segurança de Runtime) ---
     const CONFIG = Object.freeze({
         WORLD_SIZE: 400,
         COLORS: {
-            BG: 0x050510,
-            GRID1: 0x535c68,
-            GRID2: 0x130f40,
-            PLAYER: 0x00d2d3,
-            ENEMY_BASE: 0xff4757,
-            PROJECTILE: 0xffff00
+            BG: 0x0a0e27,
+            GRID1: 0x00f5ff,
+            GRID2: 0x1a1f3a,
+            PLAYER: 0x00f5ff,
+            PLAYER_GLOW: 0x00f5ff,
+            ENEMY_BASE: 0xff006e,
+            PROJECTILE: 0xfffb00,
+            PARTICLE: 0xb967ff
         },
         SPAWN: {
             INITIAL_RATE: 2.0,
@@ -149,18 +531,14 @@
         }
     });
 
-    // --- VETORES TEMPORÁRIOS (Otimização de Memória) ---
-    // Evita criar 'new THREE.Vector3' dentro do loop de renderização (Garbage Collection Reduction)
     const _tempVec3 = new THREE.Vector3();
     const _tempDir = new THREE.Vector3();
     const _tempPos = new THREE.Vector3();
 
-    // --- VARIÁVEIS DO ESCOPO ---
-    let scene, camera, renderer, raycaster;
+    let scene, camera, renderer, raycaster, composer;
     let planeMesh; 
     let mouse3D = new THREE.Vector3();
     
-    // Estado do Jogo
     const GameState = { MENU: 0, PLAYING: 1, LEVEL_UP: 2, GAME_OVER: 3 };
     let currentState = GameState.MENU;
     let entities = [];
@@ -170,11 +548,9 @@
     let lastTime = 0;
     let animationFrameId;
 
-    // Inputs
     const keys = { w: false, a: false, s: false, d: false };
     const mouse = { x: 0, y: 0, down: false };
 
-    // Elementos de UI (Cache)
     const ui = {
         screens: {
             menu: document.getElementById('start-screen'),
@@ -192,18 +568,28 @@
         }
     };
 
-    // --- INICIALIZAÇÃO ---
     function init() {
-        setupThreeJS();
-        setupInputs();
-        setupEvents();
-        animate(0);
+        try {
+            setupThreeJS();
+            setupInputs();
+            setupEvents();
+            animate(performance.now());
+        } catch(e) {
+            console.error('Init error:', e);
+        }
     }
+
+    // Prevent page reload on errors
+    window.addEventListener('error', function(e) {
+        console.error('Global error:', e.error);
+        e.preventDefault();
+        return true;
+    });
 
     function setupThreeJS() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(CONFIG.COLORS.BG);
-        scene.fog = new THREE.FogExp2(CONFIG.COLORS.BG, 0.0035);
+        scene.fog = new THREE.FogExp2(CONFIG.COLORS.BG, 0.003);
 
         camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 180, 100);
@@ -211,21 +597,20 @@
 
         renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita pixel ratio para performance
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras mais suaves
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.getElementById('game-container').appendChild(renderer.domElement);
 
-        // Iluminação
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        // Enhanced Lighting
+        const ambientLight = new THREE.AmbientLight(0x4a5b8c, 0.3);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        const dirLight = new THREE.DirectionalLight(0x00f5ff, 0.8);
         dirLight.position.set(100, 200, 100);
         dirLight.castShadow = true;
-        // Otimização de sombras: área restrita ao gameplay
-        dirLight.shadow.mapSize.width = 1024;
-        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
         const d = 250;
         dirLight.shadow.camera.left = -d;
         dirLight.shadow.camera.right = d;
@@ -233,11 +618,39 @@
         dirLight.shadow.camera.bottom = -d;
         scene.add(dirLight);
 
-        // Grid e Ambiente
-        const gridHelper = new THREE.GridHelper(CONFIG.WORLD_SIZE * 2, 40, CONFIG.COLORS.GRID1, CONFIG.COLORS.GRID2);
+        // Accent lights for cyberpunk vibe
+        const pinkLight = new THREE.PointLight(0xff006e, 1, 300);
+        pinkLight.position.set(-100, 50, -100);
+        scene.add(pinkLight);
+
+        const purpleLight = new THREE.PointLight(0xb967ff, 1, 300);
+        purpleLight.position.set(100, 50, 100);
+        scene.add(purpleLight);
+
+        // Enhanced Grid
+        const gridHelper = new THREE.GridHelper(
+            CONFIG.WORLD_SIZE * 2, 
+            60, 
+            CONFIG.COLORS.GRID1, 
+            CONFIG.COLORS.GRID2
+        );
+        gridHelper.material.opacity = 0.3;
+        gridHelper.material.transparent = true;
         scene.add(gridHelper);
 
-        // Plane invisível para Raycasting
+        // Add glowing floor plane
+        const floorGeo = new THREE.PlaneGeometry(CONFIG.WORLD_SIZE * 2, CONFIG.WORLD_SIZE * 2);
+        const floorMat = new THREE.MeshBasicMaterial({ 
+            color: 0x0a0e27,
+            transparent: true,
+            opacity: 0.5
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.5;
+        scene.add(floor);
+
+        // Raycasting plane
         const planeGeo = new THREE.PlaneGeometry(1000, 1000);
         const planeMat = new THREE.MeshBasicMaterial({ visible: false });
         planeMesh = new THREE.Mesh(planeGeo, planeMat);
@@ -257,7 +670,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Previne menu de contexto (botão direito) durante o jogo
         document.addEventListener('contextmenu', event => event.preventDefault());
     }
 
@@ -271,32 +683,48 @@
 
         window.addEventListener('keydown', e => onKey(e, true));
         window.addEventListener('keyup', e => onKey(e, false));
-        
         window.addEventListener('mousedown', () => mouse.down = true);
         window.addEventListener('mouseup', () => mouse.down = false);
-        
         window.addEventListener('mousemove', (event) => {
-            // Normalização de coordenadas (-1 a +1)
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         });
     }
 
     function startGame() {
-        // Cleanup completo
+        // Clean up all entities
         entities.forEach(e => {
             scene.remove(e.mesh);
+            
+            // Clean up enemy glow mesh
+            if (e instanceof Enemy && e.glowMesh) {
+                scene.remove(e.glowMesh);
+                if(e.glowMesh.geometry) e.glowMesh.geometry.dispose();
+                if(e.glowMesh.material) e.glowMesh.material.dispose();
+            }
+            
             if(e.mesh.geometry) e.mesh.geometry.dispose();
-            if(e.mesh.material) e.mesh.material.dispose();
+            if(e.mesh.material) {
+                if(Array.isArray(e.mesh.material)) {
+                    e.mesh.material.forEach(m => m.dispose());
+                } else {
+                    e.mesh.material.dispose();
+                }
+            }
         });
-        particles.forEach(p => scene.remove(p.mesh));
+        
+        particles.forEach(p => {
+            scene.remove(p.mesh);
+            if(p.mesh.geometry) p.mesh.geometry.dispose();
+            if(p.mesh.material) p.mesh.material.dispose();
+        });
         
         entities = [];
         particles = [];
         score = 0;
         waveTimer = 0;
+        lastTime = 0; // Reset to 0 so animate() will reinitialize it
         
-        // Player Init
         const player = new Player();
         entities.push(player);
         
@@ -306,20 +734,27 @@
 
     function toggleModal(id) {
         Object.values(ui.screens).forEach(el => el.classList.remove('active'));
-        if(id !== 'none' && ui.screens[id]) return ui.screens[id].classList.add('active'); // Bug fix: return element
-        if(id !== 'none') document.getElementById(id).classList.add('active'); // Fallback
+        if(id !== 'none' && ui.screens[id]) {
+            ui.screens[id].classList.add('active');
+        }
     }
 
-    // --- GAME LOOP ---
     function animate(time) {
         animationFrameId = requestAnimationFrame(animate);
         
-        // Delta Time Cap (previne bugs de física se o frame rate cair muito)
+        // Initialize lastTime on first frame
+        if (lastTime === 0) {
+            lastTime = time;
+        }
+        
         const dt = Math.min((time - lastTime) / 1000, 0.1); 
         lastTime = time;
 
         if (currentState === GameState.PLAYING) {
             updateLogic(dt);
+            updateHUD();
+        } else if (currentState === GameState.LEVEL_UP) {
+            // Keep rendering during level up, just don't update game logic
             updateHUD();
         }
 
@@ -327,16 +762,14 @@
     }
 
     function updateLogic(dt) {
-        // Raycaster Otimizado
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObject(planeMesh);
         if (intersects.length > 0) {
             mouse3D.copy(intersects[0].point);
         }
 
-        // Spawn System
         waveTimer += dt;
-        const difficultyFactor = Math.min(score / 5000, 1); // 0 a 1
+        const difficultyFactor = Math.min(score / 5000, 1);
         const currentSpawnRate = CONFIG.SPAWN.INITIAL_RATE - (difficultyFactor * (CONFIG.SPAWN.INITIAL_RATE - CONFIG.SPAWN.MIN_RATE));
         
         if (waveTimer > currentSpawnRate) {
@@ -344,21 +777,26 @@
             waveTimer = 0;
         }
 
-        // Entity Update Loop (Reverso para splice seguro)
         for (let i = entities.length - 1; i >= 0; i--) {
             const ent = entities[i];
             ent.update(dt);
             
             if (ent.dead) {
                 scene.remove(ent.mesh);
-                // Dispose materials/geometry para evitar memory leak
+                
+                // Clean up enemy glow mesh
+                if (ent instanceof Enemy && ent.glowMesh) {
+                    scene.remove(ent.glowMesh);
+                    if(ent.glowMesh.geometry) ent.glowMesh.geometry.dispose();
+                    if(ent.glowMesh.material) ent.glowMesh.material.dispose();
+                    ent.glowMesh = null;
+                }
+                
                 if(ent.mesh.geometry) ent.mesh.geometry.dispose();
-                // Material pode ser compartilhado, cuidado ao dar dispose
                 entities.splice(i, 1);
             }
         }
 
-        // Particle Update Loop
         for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
             p.update(dt);
@@ -369,7 +807,6 @@
             }
         }
 
-        // Camera Follow Suavizado
         const player = entities.find(e => e instanceof Player);
         if (player) {
             const targetX = player.mesh.position.x;
@@ -387,17 +824,14 @@
 
         ui.hud.hpText.textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
         ui.hud.hpBar.style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
-        
         ui.hud.lvlText.textContent = player.level;
         ui.hud.xpBar.style.width = `${(player.xp / player.xpToNext) * 100}%`;
-        
-        ui.hud.scoreText.textContent = `SCORE: ${Math.floor(score)}`;
+        ui.hud.scoreText.textContent = `KILLS: ${Math.floor(score)}`;
     }
 
     function spawnEnemy() {
         let x, z;
         const dist = CONFIG.WORLD_SIZE;
-        // Spawn sempre nas bordas para não aparecer na cara do player
         if (Math.random() < 0.5) {
             x = (Math.random() - 0.5) * dist * 2;
             z = Math.random() < 0.5 ? -dist : dist;
@@ -416,8 +850,6 @@
         }
     }
 
-    // --- CLASSES ---
-
     class Entity {
         constructor(mesh) {
             this.mesh = mesh;
@@ -432,21 +864,47 @@
         constructor() {
             const group = new THREE.Group();
             
-            // Materiais reutilizáveis não são ideais aqui pois modificamos cor, 
-            // mas geometries devem ser reutilizadas em projetos maiores.
-            const bodyGeo = new THREE.BoxGeometry(10, 10, 10);
-            const bodyMat = new THREE.MeshLambertMaterial({ color: CONFIG.COLORS.PLAYER });
+            // Cyberpunk player design
+            const bodyGeo = new THREE.BoxGeometry(12, 12, 12);
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.COLORS.PLAYER,
+                emissive: CONFIG.COLORS.PLAYER,
+                emissiveIntensity: 0.5,
+                metalness: 0.8,
+                roughness: 0.2
+            });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
-            body.position.y = 5;
+            body.position.y = 6;
             body.castShadow = true;
             
-            const turretGeo = new THREE.BoxGeometry(4, 4, 8);
-            const turretMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const turret = new THREE.Mesh(turretGeo, turretMat);
-            turret.position.set(0, 8, 4);
+            // Glow effect
+            const glowGeo = new THREE.BoxGeometry(14, 14, 14);
+            const glowMat = new THREE.MeshBasicMaterial({ 
+                color: CONFIG.COLORS.PLAYER_GLOW,
+                transparent: true,
+                opacity: 0.3
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.position.y = 6;
 
+            // Weapon
+            const weaponGeo = new THREE.BoxGeometry(3, 3, 14);
+            const weaponMat = new THREE.MeshStandardMaterial({ 
+                color: 0xfffb00,
+                emissive: 0xfffb00,
+                emissiveIntensity: 0.8
+            });
+            const weapon = new THREE.Mesh(weaponGeo, weaponMat);
+            weapon.position.set(0, 6, 8);
+
+            // Core light
+            const coreLight = new THREE.PointLight(0x00f5ff, 2, 50);
+            coreLight.position.set(0, 6, 0);
+
+            group.add(glow);
             group.add(body);
-            group.add(turret);
+            group.add(weapon);
+            group.add(coreLight);
 
             super(group);
             
@@ -461,10 +919,10 @@
             this.level = 1;
             this.xp = 0;
             this.xpToNext = 100;
+            this.rotationSpeed = 0;
         }
 
         update(dt) {
-            // Input Vector Optimization
             _tempVec3.set(0, 0, 0);
             if (keys.w) _tempVec3.z = -1;
             if (keys.s) _tempVec3.z = 1;
@@ -476,14 +934,16 @@
                 this.mesh.position.add(_tempVec3);
             }
 
-            // Clamping
             const limit = CONFIG.WORLD_SIZE - 5;
             this.mesh.position.x = Math.max(-limit, Math.min(limit, this.mesh.position.x));
             this.mesh.position.z = Math.max(-limit, Math.min(limit, this.mesh.position.z));
 
             this.mesh.lookAt(mouse3D.x, 0, mouse3D.z);
+            
+            // Idle rotation animation
+            this.rotationSpeed += dt * 2;
+            this.mesh.children[0].rotation.y = Math.sin(this.rotationSpeed) * 0.1;
 
-            // Shooting
             if (this.shootTimer > 0) this.shootTimer -= dt;
             if (mouse.down && this.shootTimer <= 0) {
                 this.shoot();
@@ -497,9 +957,8 @@
             _tempPos.copy(this.mesh.position);
             _tempPos.y = 8;
             
-            // Calcula direção usando vetores temporários
             _tempDir.subVectors(mouse3D, this.mesh.position).normalize();
-            _tempDir.y = 0; // Trava no eixo Y
+            _tempDir.y = 0;
             
             entities.push(new Projectile(_tempPos, _tempDir, this.projSpeed, this.damage));
         }
@@ -516,27 +975,54 @@
 
         triggerLevelUp() {
             currentState = GameState.LEVEL_UP;
-            toggleModal('upgrade-screen');
+            toggleModal('upgrade');
             
-            // Sistema de Upgrades Seguro
             const upgrades = [
-                { name: "Motor V8", desc: "+20% Movimento", action: () => this.speed *= 1.2 },
-                { name: "Núcleo Instável", desc: "+25% Dano", action: () => this.damage *= 1.25 },
-                { name: "Gatilho Leve", desc: "-15% Recarga", action: () => this.fireRate = Math.max(0.05, this.fireRate * 0.85) },
-                { name: "Acelerador Magnético", desc: "+20% Vel. Projétil", action: () => this.projSpeed *= 1.2 },
-                { name: "Reparo de Casco", desc: "Cura Total + 25HP Max", action: () => { this.maxHp += 25; this.hp = this.maxHp; } }
+                { 
+                    name: "VELOCIDADE NEURAL", 
+                    desc: "+20% movimento",
+                    icon: "⚡",
+                    action: () => this.speed *= 1.2 
+                },
+                { 
+                    name: "ARMAMENTO PLASMA", 
+                    desc: "+25% dano",
+                    icon: "⚔",
+                    action: () => this.damage *= 1.25 
+                },
+                { 
+                    name: "RECARGA QUÂNTICA", 
+                    desc: "-15% cooldown",
+                    icon: "⚙",
+                    action: () => this.fireRate = Math.max(0.05, this.fireRate * 0.85) 
+                },
+                { 
+                    name: "ACELERADOR MAGNÉTICO", 
+                    desc: "+20% vel. projétil",
+                    icon: "🚀",
+                    action: () => this.projSpeed *= 1.2 
+                },
+                { 
+                    name: "NANO REGENERAÇÃO", 
+                    desc: "Cura + 25HP max",
+                    icon: "❤",
+                    action: () => { this.maxHp += 25; this.hp = this.maxHp; } 
+                }
             ];
 
-            // Shuffle seguro
             const options = upgrades.sort(() => 0.5 - Math.random()).slice(0, 3);
 
             ui.hud.upgradesDiv.innerHTML = '';
             options.forEach(upg => {
                 const div = document.createElement('div');
                 div.className = 'upgrade-card';
-                // textContent para segurança XSS
-                const h3 = document.createElement('h3'); h3.textContent = upg.name;
-                const p = document.createElement('p'); p.textContent = upg.desc;
+                
+                const h3 = document.createElement('h3');
+                h3.textContent = upg.name;
+                
+                const p = document.createElement('p');
+                p.textContent = upg.desc;
+                
                 div.appendChild(h3);
                 div.appendChild(p);
                 
@@ -550,39 +1036,59 @@
         }
 
         die() {
+            createExplosion(this.mesh.position.x, this.mesh.position.z, 0x00f5ff, 20);
             currentState = GameState.GAME_OVER;
             ui.hud.finalScore.textContent = Math.floor(score);
-            toggleModal('game-over-screen');
+            toggleModal('gameover');
         }
     }
 
     class Enemy extends Entity {
         constructor(x, z, level) {
-            const geo = new THREE.TetrahedronGeometry(6 + (level * 0.2), 0);
-            const hue = (level * 0.05) % 1; 
-            const color = new THREE.Color().setHSL(hue, 0.7, 0.5);
-            const mat = new THREE.MeshLambertMaterial({ color: color });
-            const mesh = new THREE.Mesh(geo, mat);
+            const size = 6 + (level * 0.3);
+            const geo = new THREE.OctahedronGeometry(size, 0);
             
-            mesh.position.set(x, 6, z);
+            const hue = (level * 0.05) % 1; 
+            const color = new THREE.Color().setHSL(hue, 1, 0.5);
+            
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.6,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, size, z);
             mesh.castShadow = true;
+
+            // Enemy glow
+            const glowGeo = new THREE.OctahedronGeometry(size * 1.2, 0);
+            const glowMat = new THREE.MeshBasicMaterial({ 
+                color: color,
+                transparent: true,
+                opacity: 0.3
+            });
+            const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+            glowMesh.position.copy(mesh.position);
+            scene.add(glowMesh);
 
             super(mesh);
             
-            // Stats escaláveis
+            this.glowMesh = glowMesh;
             this.hp = 20 + (level * 10);
             this.speed = 30 + (level * 1.5);
             this.damage = 10 + level;
             this.xpVal = 20 * level;
-            this.radius = 6 + (level * 0.2);
-            this.rotSpeed = Math.random() * 2 + 1;
+            this.radius = size;
+            this.rotSpeed = Math.random() * 3 + 1;
         }
 
         update(dt) {
             const player = entities.find(e => e instanceof Player);
             if (!player || player.dead) return;
 
-            // Busca Simples
             _tempDir.subVectors(player.mesh.position, this.mesh.position);
             const dist = _tempDir.length();
             
@@ -594,7 +1100,15 @@
             this.mesh.rotation.x += this.rotSpeed * dt;
             this.mesh.rotation.y += this.rotSpeed * dt;
 
-            // Colisão Player (Overlap simples)
+            // Update glow position
+            if(this.glowMesh && !this.glowMesh.parent) {
+                // Glow mesh was removed, clean reference
+                this.glowMesh = null;
+            } else if(this.glowMesh) {
+                this.glowMesh.position.copy(this.mesh.position);
+                this.glowMesh.rotation.copy(this.mesh.rotation);
+            }
+
             if (dist < (this.radius + player.radius)) {
                 player.hp -= this.damage * dt; 
             }
@@ -602,16 +1116,16 @@
 
         takeDamage(amount) {
             this.hp -= amount;
-            // Visual Feedback sem criar novos materiais
-            const oldColor = this.mesh.material.color.getHex();
-            this.mesh.material.emissive.setHex(0xffffff);
             
-            // Debounce visual simples
-            if(!this.isFlashing) {
+            // Check if material still exists before modifying
+            if(!this.isFlashing && this.mesh && this.mesh.material && !this.dead) {
                 this.isFlashing = true;
+                const originalIntensity = this.mesh.material.emissiveIntensity || 0.6;
+                this.mesh.material.emissiveIntensity = 1.5;
+                
                 setTimeout(() => { 
-                    if(!this.dead && this.mesh) {
-                        this.mesh.material.emissive.setHex(0x000000); 
+                    if(!this.dead && this.mesh && this.mesh.material) {
+                        this.mesh.material.emissiveIntensity = originalIntensity;
                         this.isFlashing = false;
                     }
                 }, 50);
@@ -620,28 +1134,62 @@
             if (this.hp <= 0 && !this.dead) {
                 this.dead = true;
                 score += this.xpVal;
-                // Encontrar player de forma segura
+                
+                if(this.glowMesh) {
+                    scene.remove(this.glowMesh);
+                    if(this.glowMesh.geometry) this.glowMesh.geometry.dispose();
+                    if(this.glowMesh.material) this.glowMesh.material.dispose();
+                    this.glowMesh = null;
+                }
+                
                 const player = entities.find(e => e instanceof Player);
                 if(player) player.gainXp(this.xpVal);
-                createExplosion(this.mesh.position.x, this.mesh.position.z, this.mesh.material.color, 8);
+                
+                createExplosion(
+                    this.mesh.position.x, 
+                    this.mesh.position.z, 
+                    this.mesh.material.color.getHex(), 
+                    12
+                );
             }
         }
     }
 
     class Projectile extends Entity {
         constructor(pos, dir, speed, damage) {
-            const geo = new THREE.SphereGeometry(2, 6, 6); // Geometria low-poly para tiros
-            const mat = new THREE.MeshBasicMaterial({ color: CONFIG.COLORS.PROJECTILE });
+            // Glowing projectile
+            const geo = new THREE.SphereGeometry(2.5, 8, 8);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: CONFIG.COLORS.PROJECTILE
+            });
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.copy(pos);
             
-            super(mesh);
+            // Projectile glow
+            const glowGeo = new THREE.SphereGeometry(4, 8, 8);
+            const glowMat = new THREE.MeshBasicMaterial({ 
+                color: CONFIG.COLORS.PROJECTILE,
+                transparent: true,
+                opacity: 0.4
+            });
+            const glowMesh = new THREE.Mesh(glowGeo, glowMat);
             
-            this.dir = dir.clone(); // Direção precisa ser clonada pois é única
+            const group = new THREE.Group();
+            group.add(mesh);
+            group.add(glowMesh);
+            group.position.copy(pos);
+            
+            super(group);
+            
+            this.dir = dir.clone();
             this.speed = speed;
             this.damage = damage;
-            this.radius = 2;
-            this.life = 2.0;
+            this.radius = 2.5;
+            this.life = 2.5;
+            
+            // Add point light to projectile
+            const light = new THREE.PointLight(CONFIG.COLORS.PROJECTILE, 1, 30);
+            this.mesh.add(light);
         }
 
         update(dt) {
@@ -653,9 +1201,10 @@
 
             _tempVec3.copy(this.dir).multiplyScalar(this.speed * dt);
             this.mesh.position.add(_tempVec3);
+            
+            // Rotation for visual effect
+            this.mesh.rotation.z += dt * 10;
 
-            // Verificação de colisão simples O(n)
-            // Em jogos maiores, usaria Quadtree, mas aqui loop simples resolve
             for (const ent of entities) {
                 if (ent instanceof Enemy && !ent.dead) {
                     const distSq = this.mesh.position.distanceToSquared(ent.mesh.position);
@@ -664,7 +1213,12 @@
                     if (distSq < radiiSum * radiiSum) {
                         ent.takeDamage(this.damage);
                         this.dead = true;
-                        createExplosion(this.mesh.position.x, this.mesh.position.z, CONFIG.COLORS.PROJECTILE, 3);
+                        createExplosion(
+                            this.mesh.position.x, 
+                            this.mesh.position.z, 
+                            CONFIG.COLORS.PROJECTILE, 
+                            5
+                        );
                         return;
                     }
                 }
@@ -674,23 +1228,39 @@
 
     class Particle extends Entity {
         constructor(x, z, color) {
-            const geo = new THREE.BoxGeometry(2, 2, 2);
-            const mat = new THREE.MeshBasicMaterial({ color: color });
+            const geo = new THREE.BoxGeometry(3, 3, 3);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: color,
+                transparent: true
+            });
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.set(x, 6, z);
-            mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+            mesh.rotation.set(
+                Math.random() * Math.PI, 
+                Math.random() * Math.PI, 
+                Math.random() * Math.PI
+            );
 
             super(mesh);
             
             const angle = Math.random() * Math.PI * 2;
-            const speed = Math.random() * 40 + 10;
-            this.vel = new THREE.Vector3(Math.cos(angle)*speed, Math.random()*40, Math.sin(angle)*speed);
-            this.gravity = -100;
+            const speed = Math.random() * 50 + 20;
+            this.vel = new THREE.Vector3(
+                Math.cos(angle) * speed, 
+                Math.random() * 50 + 20, 
+                Math.sin(angle) * speed
+            );
+            this.gravity = -120;
             this.life = 1.0;
+            this.rotVel = new THREE.Vector3(
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 10
+            );
         }
 
         update(dt) {
-            this.life -= dt * 2.5;
+            this.life -= dt * 2;
             if (this.life <= 0) this.dead = true;
 
             this.vel.y += this.gravity * dt;
@@ -698,18 +1268,23 @@
             _tempVec3.copy(this.vel).multiplyScalar(dt);
             this.mesh.position.add(_tempVec3);
             
-            this.mesh.scale.setScalar(Math.max(0, this.life));
+            this.mesh.rotation.x += this.rotVel.x * dt;
+            this.mesh.rotation.y += this.rotVel.y * dt;
+            this.mesh.rotation.z += this.rotVel.z * dt;
+            
+            const scale = Math.max(0, this.life);
+            this.mesh.scale.setScalar(scale);
+            this.mesh.material.opacity = scale;
             
             if (this.mesh.position.y < 1) {
                 this.mesh.position.y = 1;
-                this.vel.y *= -0.5;
-                this.vel.x *= 0.8;
-                this.vel.z *= 0.8;
+                this.vel.y *= -0.4;
+                this.vel.x *= 0.7;
+                this.vel.z *= 0.7;
             }
         }
     }
 
-    // Iniciar Jogo
     init();
 
 })(); 
