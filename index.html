@@ -462,6 +462,32 @@
         }
 
         /* Responsive */
+        /* Touch Joystick */
+        #touch-joystick-base {
+            position: fixed;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 245, 255, 0.5);
+            background: rgba(10, 14, 39, 0.5);
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.25);
+            pointer-events: none;
+            display: none;
+            z-index: 1000;
+            transform: translate(-50%, -50%);
+        }
+        #touch-joystick-knob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #00f5ff;
+            box-shadow: 0 0 15px #00f5ff;
+            transform: translate(-50%, -50%);
+        }
+
         @media (max-width: 768px) {
             .modal { min-width: 300px; padding: 30px; }
             h1 { font-size: 2rem; }
@@ -473,6 +499,9 @@
 <body>
 
 <a href="https://marcuscaiado.github.io/marcus-arcade/" style="position:fixed; top:20px; right:20px; z-index:9999; background:rgba(10,14,39,0.9); border:2px solid #00f5ff; color:#00f5ff; padding:10px 18px; border-radius:8px; font-family:'Orbitron',monospace; font-weight:700; text-decoration:none; box-shadow:0 0 15px rgba(0,245,255,0.4); text-transform:uppercase; font-size:12px; transition: all 0.2s ease;">🕹️ Arcade Hub</a>
+
+<!-- Dynamic Touch Joystick for Mobile -->
+<div id="touch-joystick-base"><div id="touch-joystick-knob"></div></div>
 
 <div id="game-container"></div>
 
@@ -493,7 +522,7 @@
         <h1>NEON PROTOCOL</h1>
         <div class="subtitle">GEOMETRIC SURVIVOR</div>
         <p>Sistema de defesa ativado.<br>Elimine as anomalias geométricas hostis.</p>
-        <div class="controls-hint">[WASD] MOVIMENTO | [MOUSE] MIRA/DISPARO</div>
+        <div class="controls-hint">📱 [TOUCH] JOYSTICK NA TELA &bull; 🖱️ [MOUSE] CLIQUE/ARRASTE &bull; ⚡ AUTO-FIRE ATIVO</div>
         <button id="btn-start">INICIAR MISSÃO</button>
     </div>
 
@@ -675,7 +704,13 @@
         document.addEventListener('contextmenu', event => event.preventDefault());
     }
 
+    const touchInput = { active: false, startX: 0, startY: 0, dirX: 0, dirZ: 0 };
+    let joyBase, joyKnob;
+
     function setupInputs() {
+        joyBase = document.getElementById('touch-joystick-base');
+        joyKnob = document.getElementById('touch-joystick-knob');
+
         const onKey = (e, status) => {
             const k = e.key.toLowerCase();
             if (keys.hasOwnProperty(k)) {
@@ -685,11 +720,64 @@
 
         window.addEventListener('keydown', e => onKey(e, true));
         window.addEventListener('keyup', e => onKey(e, false));
-        window.addEventListener('mousedown', () => mouse.down = true);
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button, .upgrade-card, a')) return;
+            mouse.down = true;
+        });
         window.addEventListener('mouseup', () => mouse.down = false);
         window.addEventListener('mousemove', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Touch Virtual Joystick for Mobile
+        window.addEventListener('touchstart', (e) => {
+            if (currentState !== GameState.PLAYING) return;
+            if (e.target.closest('button, .upgrade-card, a')) return;
+            const t = e.touches[0];
+            touchInput.active = true;
+            touchInput.startX = t.clientX;
+            touchInput.startY = t.clientY;
+            touchInput.dirX = 0;
+            touchInput.dirZ = 0;
+            if (joyBase) {
+                joyBase.style.left = t.clientX + 'px';
+                joyBase.style.top = t.clientY + 'px';
+                joyBase.style.display = 'block';
+                if (joyKnob) joyKnob.style.transform = 'translate(-50%, -50%)';
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!touchInput.active) return;
+            const t = e.touches[0];
+            const dx = t.clientX - touchInput.startX;
+            const dy = t.clientY - touchInput.startY;
+            const dist = Math.hypot(dx, dy);
+            const maxR = 50;
+
+            if (dist > 6) {
+                touchInput.dirX = dx / Math.max(dist, maxR);
+                touchInput.dirZ = dy / Math.max(dist, maxR);
+            } else {
+                touchInput.dirX = 0;
+                touchInput.dirZ = 0;
+            }
+
+            if (joyKnob) {
+                const clampedDist = Math.min(dist, maxR);
+                const angle = Math.atan2(dy, dx);
+                const kx = Math.cos(angle) * clampedDist;
+                const ky = Math.sin(angle) * clampedDist;
+                joyKnob.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            touchInput.active = false;
+            touchInput.dirX = 0;
+            touchInput.dirZ = 0;
+            if (joyBase) joyBase.style.display = 'none';
         });
     }
 
@@ -926,13 +1014,30 @@
 
         update(dt) {
             _tempVec3.set(0, 0, 0);
-            if (keys.w) _tempVec3.z = -1;
-            if (keys.s) _tempVec3.z = 1;
-            if (keys.a) _tempVec3.x = -1;
-            if (keys.d) _tempVec3.x = 1;
+
+            // 1. Touch Joystick Movement (Mobile)
+            if (touchInput.active && (touchInput.dirX !== 0 || touchInput.dirZ !== 0)) {
+                _tempVec3.set(touchInput.dirX, 0, touchInput.dirZ);
+            }
+            // 2. Mouse Click & Drag Movement (Desktop Mouse-only)
+            else if (mouse.down) {
+                const toMouse = new THREE.Vector3().subVectors(mouse3D, this.mesh.position);
+                toMouse.y = 0;
+                if (toMouse.length() > 8) {
+                    _tempVec3.copy(toMouse).normalize();
+                }
+            }
+            // 3. Keyboard (WASD / Arrows as alternate)
+            else {
+                if (keys.w) _tempVec3.z = -1;
+                if (keys.s) _tempVec3.z = 1;
+                if (keys.a) _tempVec3.x = -1;
+                if (keys.d) _tempVec3.x = 1;
+                if (_tempVec3.lengthSq() > 0) _tempVec3.normalize();
+            }
 
             if (_tempVec3.lengthSq() > 0) {
-                _tempVec3.normalize().multiplyScalar(this.speed * dt);
+                _tempVec3.multiplyScalar(this.speed * dt);
                 this.mesh.position.add(_tempVec3);
             }
 
@@ -940,26 +1045,57 @@
             this.mesh.position.x = Math.max(-limit, Math.min(limit, this.mesh.position.x));
             this.mesh.position.z = Math.max(-limit, Math.min(limit, this.mesh.position.z));
 
-            this.mesh.lookAt(mouse3D.x, 0, mouse3D.z);
+            // Aiming target: nearest enemy or mouse/movement direction
+            const targetPos = this.findNearestEnemy();
+            if (targetPos) {
+                this.mesh.lookAt(targetPos.x, 0, targetPos.z);
+            } else if (mouse3D && mouse3D.lengthSq() > 0 && !touchInput.active) {
+                this.mesh.lookAt(mouse3D.x, 0, mouse3D.z);
+            } else if (_tempVec3.lengthSq() > 0) {
+                this.mesh.lookAt(this.mesh.position.x + _tempVec3.x, 0, this.mesh.position.z + _tempVec3.z);
+            }
             
             // Idle rotation animation
             this.rotationSpeed += dt * 2;
             this.mesh.children[0].rotation.y = Math.sin(this.rotationSpeed) * 0.1;
 
+            // Auto-fire (Vampire Survivors style)
             if (this.shootTimer > 0) this.shootTimer -= dt;
-            if (mouse.down && this.shootTimer <= 0) {
-                this.shoot();
+            if (this.shootTimer <= 0) {
+                this.shoot(targetPos);
                 this.shootTimer = this.fireRate;
             }
 
             if (this.hp <= 0) this.die();
         }
 
-        shoot() {
+        findNearestEnemy() {
+            let nearest = null;
+            let minDist = 220; // Auto-target range
+            for (let i = 0; i < entities.length; i++) {
+                const ent = entities[i];
+                if (ent instanceof Enemy && !ent.dead) {
+                    const d = this.mesh.position.distanceTo(ent.mesh.position);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = ent.mesh.position;
+                    }
+                }
+            }
+            return nearest;
+        }
+
+        shoot(targetPos) {
             _tempPos.copy(this.mesh.position);
             _tempPos.y = 8;
             
-            _tempDir.subVectors(mouse3D, this.mesh.position).normalize();
+            if (targetPos) {
+                _tempDir.subVectors(targetPos, this.mesh.position).normalize();
+            } else if (mouse3D && mouse3D.lengthSq() > 0 && !touchInput.active) {
+                _tempDir.subVectors(mouse3D, this.mesh.position).normalize();
+            } else {
+                this.mesh.getWorldDirection(_tempDir);
+            }
             _tempDir.y = 0;
             
             entities.push(new Projectile(_tempPos, _tempDir, this.projSpeed, this.damage));
