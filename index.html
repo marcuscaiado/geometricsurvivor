@@ -461,38 +461,83 @@
             animation: glitch 0.3s infinite, title-glow 2s ease-in-out infinite alternate;
         }
 
-        /* Responsive */
-        /* Touch Joystick */
-        #touch-joystick-base {
+        /* Touch & Mobile Controls */
+        * {
+            touch-action: none;
+            -webkit-touch-callout: none;
+        }
+
+        #mobile-touch-deck {
             position: fixed;
+            bottom: 24px;
+            left: 0;
+            right: 0;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 120;
+        }
+
+        #touch-stick-zone {
+            position: relative;
             width: 120px;
             height: 120px;
             border-radius: 50%;
-            border: 2px solid rgba(0, 245, 255, 0.5);
-            background: rgba(10, 14, 39, 0.5);
-            box-shadow: 0 0 20px rgba(0, 245, 255, 0.25);
-            pointer-events: none;
-            display: none;
-            z-index: 1000;
-            transform: translate(-50%, -50%);
+            border: 2px solid rgba(0, 245, 255, 0.6);
+            background: rgba(10, 14, 39, 0.6);
+            box-shadow: 0 0 25px rgba(0, 245, 255, 0.3), inset 0 0 15px rgba(0, 245, 255, 0.15);
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        #touch-joystick-knob {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 44px;
-            height: 44px;
+
+        #touch-stick-knob {
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
-            background: #00f5ff;
-            box-shadow: 0 0 15px #00f5ff;
-            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, #00f5ff 0%, #050810 90%);
+            border: 2px solid #00f5ff;
+            box-shadow: 0 0 20px #00f5ff;
+            pointer-events: none;
+            transition: transform 0.05s ease-out;
+        }
+
+        #touch-fire-btn {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 0, 110, 0.8) 0%, rgba(10, 14, 39, 0.9) 100%);
+            border: 3px solid #ff006e;
+            box-shadow: 0 0 25px rgba(255, 0, 110, 0.5), inset 0 0 15px rgba(255, 0, 110, 0.3);
+            color: #fff;
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            font-weight: 900;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            pointer-events: auto;
+            user-select: none;
+            cursor: pointer;
+            text-shadow: 0 0 10px #ff006e;
+        }
+
+        #touch-fire-btn:active, #touch-fire-btn.active {
+            transform: scale(0.92);
+            box-shadow: 0 0 40px rgba(255, 0, 110, 0.9);
+            background: radial-gradient(circle, #ff006e 0%, rgba(10, 14, 39, 0.9) 100%);
         }
 
         @media (max-width: 768px) {
-            .modal { min-width: 300px; padding: 30px; }
-            h1 { font-size: 2rem; }
-            #hud { top: 15px; left: 15px; padding: 15px; }
-            .bar-container { width: 180px; }
+            .modal { min-width: 290px; padding: 24px; }
+            h1 { font-size: 1.8rem; }
+            #hud { top: 10px; left: 10px; padding: 12px; font-size: 0.8rem; }
+            .bar-container { width: 140px; }
         }
     </style>
 </head>
@@ -500,8 +545,16 @@
 
 <a href="https://marcuscaiado.github.io/marcus-arcade/" style="position:fixed; top:20px; right:20px; z-index:9999; background:rgba(10,14,39,0.9); border:2px solid #00f5ff; color:#00f5ff; padding:10px 18px; border-radius:8px; font-family:'Orbitron',monospace; font-weight:700; text-decoration:none; box-shadow:0 0 15px rgba(0,245,255,0.4); text-transform:uppercase; font-size:12px; transition: all 0.2s ease;">🕹️ Arcade Hub</a>
 
-<!-- Dynamic Touch Joystick for Mobile -->
-<div id="touch-joystick-base"><div id="touch-joystick-knob"></div></div>
+<!-- Permanent Touch Control Deck for Mobile -->
+<div id="mobile-touch-deck">
+    <div id="touch-stick-zone">
+        <div id="touch-stick-knob"></div>
+    </div>
+    <div id="touch-fire-btn">
+        <span style="font-size: 20px;">⚡</span>
+        <span>FIRE</span>
+    </div>
+</div>
 
 <div id="game-container"></div>
 
@@ -704,12 +757,13 @@
         document.addEventListener('contextmenu', event => event.preventDefault());
     }
 
-    const touchInput = { active: false, startX: 0, startY: 0, dirX: 0, dirZ: 0 };
-    let joyBase, joyKnob;
+    const touchInput = { active: false, stickTouchId: null, dirX: 0, dirZ: 0, firing: false };
+    let stickZone, stickKnob, fireBtn;
 
     function setupInputs() {
-        joyBase = document.getElementById('touch-joystick-base');
-        joyKnob = document.getElementById('touch-joystick-knob');
+        stickZone = document.getElementById('touch-stick-zone');
+        stickKnob = document.getElementById('touch-stick-knob');
+        fireBtn = document.getElementById('touch-fire-btn');
 
         const onKey = (e, status) => {
             const k = e.key.toLowerCase();
@@ -730,33 +784,71 @@
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         });
 
-        // Touch Virtual Joystick for Mobile
+        // Fire Button Touch
+        if (fireBtn) {
+            fireBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchInput.firing = true;
+                fireBtn.classList.add('active');
+            }, { passive: false });
+            fireBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                touchInput.firing = false;
+                fireBtn.classList.remove('active');
+            }, { passive: false });
+        }
+
+        // Joystick Touch (Fixed Zone & Left Half of screen)
         window.addEventListener('touchstart', (e) => {
             if (currentState !== GameState.PLAYING) return;
-            if (e.target.closest('button, .upgrade-card, a')) return;
-            const t = e.touches[0];
-            touchInput.active = true;
-            touchInput.startX = t.clientX;
-            touchInput.startY = t.clientY;
-            touchInput.dirX = 0;
-            touchInput.dirZ = 0;
-            if (joyBase) {
-                joyBase.style.left = t.clientX + 'px';
-                joyBase.style.top = t.clientY + 'px';
-                joyBase.style.display = 'block';
-                if (joyKnob) joyKnob.style.transform = 'translate(-50%, -50%)';
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.clientX < window.innerWidth * 0.6 && touchInput.stickTouchId === null) {
+                    // Claim this touch for movement
+                    touchInput.active = true;
+                    touchInput.stickTouchId = t.identifier;
+                    updateStick(t);
+                }
             }
         }, { passive: true });
 
         window.addEventListener('touchmove', (e) => {
             if (!touchInput.active) return;
-            const t = e.touches[0];
-            const dx = t.clientX - touchInput.startX;
-            const dy = t.clientY - touchInput.startY;
-            const dist = Math.hypot(dx, dy);
-            const maxR = 50;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === touchInput.stickTouchId) {
+                    updateStick(t);
+                }
+            }
+        }, { passive: true });
 
-            if (dist > 6) {
+        const endStickTouch = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === touchInput.stickTouchId) {
+                    touchInput.active = false;
+                    touchInput.stickTouchId = null;
+                    touchInput.dirX = 0;
+                    touchInput.dirZ = 0;
+                    if (stickKnob) stickKnob.style.transform = 'translate(0, 0)';
+                }
+            }
+        };
+
+        window.addEventListener('touchend', endStickTouch, { passive: true });
+        window.addEventListener('touchcancel', endStickTouch, { passive: true });
+
+        function updateStick(touch) {
+            const rect = stickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const dx = touch.clientX - centerX;
+            const dy = touch.clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+            const maxR = 45;
+
+            if (dist > 5) {
                 touchInput.dirX = dx / Math.max(dist, maxR);
                 touchInput.dirZ = dy / Math.max(dist, maxR);
             } else {
@@ -764,21 +856,14 @@
                 touchInput.dirZ = 0;
             }
 
-            if (joyKnob) {
-                const clampedDist = Math.min(dist, maxR);
+            if (stickKnob) {
+                const clamped = Math.min(dist, maxR);
                 const angle = Math.atan2(dy, dx);
-                const kx = Math.cos(angle) * clampedDist;
-                const ky = Math.sin(angle) * clampedDist;
-                joyKnob.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
+                const kx = Math.cos(angle) * clamped;
+                const ky = Math.sin(angle) * clamped;
+                stickKnob.style.transform = `translate(${kx}px, ${ky}px)`;
             }
-        }, { passive: true });
-
-        window.addEventListener('touchend', () => {
-            touchInput.active = false;
-            touchInput.dirX = 0;
-            touchInput.dirZ = 0;
-            if (joyBase) joyBase.style.display = 'none';
-        });
+        }
     }
 
     function startGame() {
