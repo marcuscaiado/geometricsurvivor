@@ -633,7 +633,7 @@
     let animationFrameId;
 
     const keys = { w: false, a: false, s: false, d: false };
-    const mouse = { x: 0, y: 0, down: false };
+    const mouse = { x: 0, y: 0, down: false, active: false };
 
     const ui = {
         screens: {
@@ -780,6 +780,7 @@
         });
         window.addEventListener('mouseup', () => mouse.down = false);
         window.addEventListener('mousemove', (event) => {
+            mouse.active = true;
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         });
@@ -1095,6 +1096,7 @@
             this.xp = 0;
             this.xpToNext = 100;
             this.rotationSpeed = 0;
+            this.facingDir = new THREE.Vector3(0, 0, -1);
         }
 
         update(dt) {
@@ -1103,22 +1105,27 @@
             // 1. Touch Joystick Movement (Mobile)
             if (touchInput.active && (touchInput.dirX !== 0 || touchInput.dirZ !== 0)) {
                 _tempVec3.set(touchInput.dirX, 0, touchInput.dirZ);
+                this.facingDir.copy(_tempVec3).normalize();
             }
             // 2. Mouse Click & Drag Movement (Desktop Mouse-only)
-            else if (mouse.down) {
+            else if (mouse.down && mouse.active) {
                 const toMouse = new THREE.Vector3().subVectors(mouse3D, this.mesh.position);
                 toMouse.y = 0;
-                if (toMouse.length() > 8) {
+                if (toMouse.length() > 6) {
                     _tempVec3.copy(toMouse).normalize();
+                    this.facingDir.copy(_tempVec3);
                 }
             }
-            // 3. Keyboard (WASD / Arrows as alternate)
+            // 3. Keyboard (WASD / Arrows)
             else {
                 if (keys.w) _tempVec3.z = -1;
                 if (keys.s) _tempVec3.z = 1;
                 if (keys.a) _tempVec3.x = -1;
                 if (keys.d) _tempVec3.x = 1;
-                if (_tempVec3.lengthSq() > 0) _tempVec3.normalize();
+                if (_tempVec3.lengthSq() > 0) {
+                    _tempVec3.normalize();
+                    this.facingDir.copy(_tempVec3);
+                }
             }
 
             if (_tempVec3.lengthSq() > 0) {
@@ -1130,19 +1137,13 @@
             this.mesh.position.x = Math.max(-limit, Math.min(limit, this.mesh.position.x));
             this.mesh.position.z = Math.max(-limit, Math.min(limit, this.mesh.position.z));
 
-            // Aiming target: nearest enemy or mouse/movement direction
+            // Stable Aiming: Always prioritize nearest active enemy on the map
             const targetPos = this.findNearestEnemy();
             if (targetPos) {
-                this.mesh.lookAt(targetPos.x, 0, targetPos.z);
-            } else if (mouse3D && mouse3D.lengthSq() > 0 && !touchInput.active) {
-                this.mesh.lookAt(mouse3D.x, 0, mouse3D.z);
-            } else if (_tempVec3.lengthSq() > 0) {
-                this.mesh.lookAt(this.mesh.position.x + _tempVec3.x, 0, this.mesh.position.z + _tempVec3.z);
+                this.mesh.lookAt(targetPos.x, this.mesh.position.y, targetPos.z);
+            } else if (this.facingDir.lengthSq() > 0.001) {
+                this.mesh.lookAt(this.mesh.position.x + this.facingDir.x, this.mesh.position.y, this.mesh.position.z + this.facingDir.z);
             }
-            
-            // Idle rotation animation
-            this.rotationSpeed += dt * 2;
-            this.mesh.children[0].rotation.y = Math.sin(this.rotationSpeed) * 0.1;
 
             // Auto-fire (Vampire Survivors style)
             if (this.shootTimer > 0) this.shootTimer -= dt;
@@ -1156,10 +1157,10 @@
 
         findNearestEnemy() {
             let nearest = null;
-            let minDist = 220; // Auto-target range
+            let minDist = 400; // Search full arena
             for (let i = 0; i < entities.length; i++) {
                 const ent = entities[i];
-                if (ent instanceof Enemy && !ent.dead) {
+                if (ent instanceof Enemy && !ent.dead && ent.mesh) {
                     const d = this.mesh.position.distanceTo(ent.mesh.position);
                     if (d < minDist) {
                         minDist = d;
@@ -1172,14 +1173,20 @@
 
         shoot(targetPos) {
             _tempPos.copy(this.mesh.position);
-            _tempPos.y = 8;
+            _tempPos.y = 6;
             
             if (targetPos) {
-                _tempDir.subVectors(targetPos, this.mesh.position).normalize();
-            } else if (mouse3D && mouse3D.lengthSq() > 0 && !touchInput.active) {
-                _tempDir.subVectors(mouse3D, this.mesh.position).normalize();
+                _tempDir.subVectors(targetPos, this.mesh.position);
+                _tempDir.y = 0;
+                if (_tempDir.lengthSq() > 0.001) {
+                    _tempDir.normalize();
+                } else {
+                    _tempDir.copy(this.facingDir);
+                }
+            } else if (this.facingDir.lengthSq() > 0.001) {
+                _tempDir.copy(this.facingDir);
             } else {
-                this.mesh.getWorldDirection(_tempDir);
+                _tempDir.set(0, 0, -1);
             }
             _tempDir.y = 0;
             
@@ -1404,11 +1411,11 @@
             
             super(group);
             
-            this.dir = dir.clone();
+            this.dir = dir.clone().normalize();
             this.speed = speed;
             this.damage = damage;
             this.radius = 2.5;
-            this.life = 2.5;
+            this.life = 1.2;
             
             // Add point light to projectile
             const light = new THREE.PointLight(CONFIG.COLORS.PROJECTILE, 1, 30);
