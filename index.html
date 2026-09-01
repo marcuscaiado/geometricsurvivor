@@ -1086,16 +1086,16 @@
             super(group);
             
             this.mesh.position.set(0, 0, 0);
-            this.speed = 85;
+            this.speed = 95;
             this.maxHp = 100;
             this.hp = this.maxHp;
-            this.fireRate = 0.25;
+            this.fireRate = 0.20;
             this.shootTimer = 0;
-            this.damage = 15;
-            this.projSpeed = 160;
+            this.damage = 18;
+            this.projSpeed = 175;
             this.level = 1;
             this.xp = 0;
-            this.xpToNext = 100;
+            this.xpToNext = 60; // Quick early upgrade for satisfying momentum
             this.rotationSpeed = 0;
             this.facingDir = new THREE.Vector3(0, 0, -1);
         }
