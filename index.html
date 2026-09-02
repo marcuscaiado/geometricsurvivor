@@ -354,6 +354,26 @@
             text-shadow: 0 0 10px rgba(255, 209, 102, 0.8), 0 2px 5px #000;
         }
 
+        .floating-dmg.dopamine {
+            background: linear-gradient(90deg, #ff007f, #ffe600, #00ff66, #00f5ff);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 22px;
+            filter: drop-shadow(0 0 12px rgba(0, 245, 255, 0.8));
+            animation: floatUp 0.85s ease-out forwards;
+        }
+
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
         @keyframes floatUp {
             0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
             20% { transform: translate(-50%, -15px) scale(1.2); opacity: 1; }
@@ -678,6 +698,9 @@
 </head>
 <body>
 
+<!-- Confetti Canvas -->
+<canvas id="confetti-canvas"></canvas>
+
 <!-- Game Canvas -->
 <div id="game-container"></div>
 
@@ -870,10 +893,75 @@
     "use strict";
 
     // =============================================
-    //  SYNTHESIZED RETRO-CARTOON AUDIO (Web Audio API)
+    //  QUAD-COLOR CONFETTI CANNON (Spectrum Engine)
+    // =============================================
+    const confettiCanvas = document.getElementById('confetti-canvas');
+    const confettiCtx = confettiCanvas ? confettiCanvas.getContext('2d') : null;
+    const confettiParticles = [];
+    const QUAD_COLORS = ['#00f5ff', '#ff477e', '#ffd166', '#06d6a0', '#8ab4f8', '#f28b82', '#c084fc'];
+
+    function resizeConfetti() {
+        if (confettiCanvas) {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+    }
+    window.addEventListener('resize', resizeConfetti);
+    resizeConfetti();
+
+    function explodeConfetti(x = window.innerWidth / 2, y = window.innerHeight * 0.4, count = 55) {
+        for (let i = 0; i < count; i++) {
+            confettiParticles.push({
+                x, y,
+                color: QUAD_COLORS[Math.floor(Math.random() * QUAD_COLORS.length)],
+                size: Math.random() * 8 + 5,
+                speedX: (Math.random() - 0.5) * 16,
+                speedY: (Math.random() - 0.8) * 18,
+                gravity: 0.45,
+                opacity: 1,
+                decay: Math.random() * 0.02 + 0.015,
+                rotation: Math.random() * 360,
+                rotSpeed: (Math.random() - 0.5) * 10
+            });
+        }
+    }
+
+    function renderConfetti() {
+        if (confettiCtx && confettiCanvas) {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            for (let i = confettiParticles.length - 1; i >= 0; i--) {
+                const p = confettiParticles[i];
+                p.x += p.speedX;
+                p.y += p.speedY;
+                p.speedY += p.gravity;
+                p.opacity -= p.decay;
+                p.rotation += p.rotSpeed;
+
+                if (p.opacity <= 0) {
+                    confettiParticles.splice(i, 1);
+                    continue;
+                }
+
+                confettiCtx.save();
+                confettiCtx.globalAlpha = Math.max(0, p.opacity);
+                confettiCtx.translate(p.x, p.y);
+                confettiCtx.rotate((p.rotation * Math.PI) / 180);
+                confettiCtx.fillStyle = p.color;
+                confettiCtx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                confettiCtx.restore();
+            }
+        }
+        requestAnimationFrame(renderConfetti);
+    }
+    renderConfetti();
+
+    // =============================================
+    //  DOPAMINE SEROTONIN AUDIO (Máxima Serotonina Standard)
     // =============================================
     const AudioEngine = {
         ctx: null,
+        gemPitchStep: 0,
+        gemScale: [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50], // C5, D5, E5, G5, A5, C6 (Pentatonic Bell Glockenspiel)
         init() {
             if (!this.ctx) {
                 const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -892,38 +980,92 @@
                 osc.frequency.setValueAtTime(freqStart, this.ctx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(Math.max(10, freqEnd), this.ctx.currentTime + duration);
                 gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
                 osc.connect(gain);
                 gain.connect(this.ctx.destination);
                 osc.start();
                 osc.stop(this.ctx.currentTime + duration);
             } catch(e) {}
         },
-        bonk() { this.playTone(190, 45, 'triangle', 0.16, 0.35); },
-        shoot() { this.playTone(650, 140, 'sine', 0.1, 0.15); },
-        magic() { this.playTone(420, 880, 'sine', 0.15, 0.2); },
-        gem() { this.playTone(700, 1400, 'triangle', 0.08, 0.16); },
-        hit() { this.playTone(130, 35, 'square', 0.14, 0.35); },
+        // Soft tactile wooden/rubber hammer pop with sub-bass thud
+        bonk() {
+            this.playTone(260, 110, 'triangle', 0.18, 0.12);
+            this.playTone(95, 38, 'sine', 0.28, 0.22); // Velvet sub-bass thud
+        },
+        shoot() {
+            this.playTone(520, 240, 'sine', 0.08, 0.12);
+        },
+        magic() {
+            this.playTone(440, 880, 'sine', 0.12, 0.18);
+        },
+        // Comforting pentatonic bell chime (ascends with consecutive pickups!)
+        gem() {
+            if (!this.ctx) return;
+            try {
+                const now = this.ctx.currentTime;
+                const freq = this.gemScale[this.gemPitchStep % this.gemScale.length];
+                this.gemPitchStep = (this.gemPitchStep + 1) % this.gemScale.length;
+
+                const osc = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now);
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(freq * 1.002, now); // Sweet chorus
+
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.16, now + 0.015);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+                osc.connect(gain);
+                osc2.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc2.start(now);
+                osc.stop(now + 0.36);
+                osc2.stop(now + 0.36);
+            } catch(e) {}
+        },
+        // Soft cushioned thud (no harsh square wave)
+        hit() {
+            this.playTone(180, 55, 'sine', 0.18, 0.18);
+        },
+        // Royal Serotonin Fanfare (Double Octave Ascension + Sparkle)
         levelUp() {
-            [440, 554, 659, 880].forEach((f, i) => {
-                setTimeout(() => this.playTone(f, f * 1.2, 'triangle', 0.22, 0.25), i * 80);
+            const fanfare = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+            fanfare.forEach((f, i) => {
+                setTimeout(() => {
+                    this.playTone(f, f * 1.02, 'triangle', 0.22, 0.4);
+                    this.playTone(f * 0.5, f * 0.51, 'sine', 0.12, 0.4);
+                }, i * 55);
             });
         },
+        // Velvet cinematic drone
         bossSpawn() {
-            this.playTone(90, 45, 'sawtooth', 0.8, 0.4);
+            this.playTone(120, 48, 'sine', 0.4, 0.8);
+        },
+        // Boss victory celebration
+        bossDefeat() {
+            const fanfare = [392.00, 523.25, 659.25, 783.99, 1046.50];
+            fanfare.forEach((f, i) => {
+                setTimeout(() => this.playTone(f, f * 1.01, 'triangle', 0.25, 0.45), i * 60);
+            });
         },
         heal() {
-            [523, 659, 784, 1046].forEach((f, i) => {
-                setTimeout(() => this.playTone(f, f * 1.05, 'triangle', 0.15, 0.22), i * 60);
+            [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => {
+                setTimeout(() => this.playTone(f, f * 1.02, 'sine', 0.16, 0.3), i * 50);
             });
         },
         invincible() {
-            [440, 554, 659, 880, 1108].forEach((f, i) => {
-                setTimeout(() => this.playTone(f, f * 1.1, 'sine', 0.2, 0.26), i * 70);
+            [440.00, 554.37, 659.25, 880.00, 1108.73].forEach((f, i) => {
+                setTimeout(() => this.playTone(f, f * 1.02, 'triangle', 0.2, 0.35), i * 60);
             });
         },
         speedBuff() {
-            this.playTone(280, 950, 'sawtooth', 0.35, 0.22);
+            this.playTone(320, 880, 'sine', 0.18, 0.25);
         }
     };
 
@@ -1472,6 +1614,7 @@
         gainXp(amount) {
             this.xp += amount;
             AudioEngine.gem();
+            spawnDamageNumber(this.mesh.position, `+${amount} XP ✨`, false, null, true);
             if (this.xp >= this.xpToNext) {
                 this.xp -= this.xpToNext;
                 this.level++;
@@ -2127,6 +2270,8 @@
 
             // Field Pickup Drop Chances:
             if (this.type === 'boss') {
+                AudioEngine.bossDefeat();
+                explodeConfetti(window.innerWidth / 2, window.innerHeight * 0.45, 80);
                 dom.bossHud.style.display = 'none';
                 activeBoss = null;
                 // Boss drops 3 giant gems, guaranteed Heart, and Power-Up!
@@ -2355,10 +2500,11 @@
     // =============================================
     //  FLOATING DAMAGE NUMBERS (3D Screen Projection)
     // =============================================
-    function spawnDamageNumber(pos3D, amount, isCrit = false) {
+    function spawnDamageNumber(pos3D, amount, isCrit = false, customColor = null, isDopamine = false) {
         const el = document.createElement('div');
-        el.className = `floating-dmg ${isCrit ? 'crit' : ''}`;
+        el.className = `floating-dmg ${isCrit ? 'crit' : ''} ${isDopamine ? 'dopamine' : ''}`;
         el.textContent = isCrit ? `CRIT! ${amount}` : amount;
+        if (customColor && !isDopamine) el.style.color = customColor;
 
         const screenPos = pos3D.clone();
         screenPos.project(camera);
@@ -2370,7 +2516,7 @@
         el.style.top = `${y}px`;
         dom.damageOverlay.appendChild(el);
 
-        setTimeout(() => el.remove(), 700);
+        setTimeout(() => el.remove(), 850);
     }
 
     function triggerDamageFlash() {
@@ -2453,6 +2599,7 @@
     function triggerLevelUp() {
         isPaused = true;
         AudioEngine.levelUp();
+        explodeConfetti(window.innerWidth / 2, window.innerHeight * 0.35, 75);
 
         // Roll 3 distinct upgrades
         const available = [...ALL_UPGRADES];
