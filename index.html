@@ -8,7 +8,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>MEGABONK 3D :: Cute Cartoon Survivor v1.4</title>
+    <title>MEGABONK 3D :: Cute Cartoon Survivor v1.5</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -213,6 +213,50 @@
         .hud-action-btn.arcade-link:hover {
             background: linear-gradient(135deg, #7209b7, #b5179e);
             box-shadow: 0 4px 15px rgba(181, 23, 158, 0.5);
+        }
+
+        /* Active Power-Up Buffs Bar */
+        #active-buffs-bar {
+            position: absolute;
+            top: 76px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .buff-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+            border: 2px solid #fff;
+            animation: buffGlow 0.8s infinite alternate ease-in-out;
+        }
+
+        .buff-badge.invincible {
+            background: linear-gradient(135deg, #ffd166, #ff9f1c);
+            color: #1a1001;
+            border-color: #ffd166;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        .buff-badge.speed {
+            background: linear-gradient(135deg, #00f5ff, #06d6a0);
+            color: #032b30;
+            border-color: #00f5ff;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        @keyframes buffGlow {
+            from { transform: scale(1); filter: brightness(1); }
+            to { transform: scale(1.06); filter: brightness(1.2); }
         }
 
         /* Active Weapon & Relic HUD Inventory */
@@ -663,7 +707,7 @@
 
     <!-- Center: Stats & Auto-Aim -->
     <div class="hud-stats-card">
-        <span style="font-size: 10px; font-weight: 900; color: #06d6a0; background: rgba(6, 214, 160, 0.15); padding: 2px 6px; border-radius: 6px;">v1.4</span>
+        <span style="font-size: 10px; font-weight: 900; color: #06d6a0; background: rgba(6, 214, 160, 0.15); padding: 2px 6px; border-radius: 6px;">v1.5</span>
         <div class="stat-item">
             <span class="stat-icon">⏱️</span>
             <span id="timer-text">00:00</span>
@@ -698,6 +742,9 @@
         </a>
     </div>
 </div>
+
+<!-- Active Power-Up Buffs Bar (Invincible, Speed Buff) -->
+<div id="active-buffs-bar"></div>
 
 <!-- Boss Health Bar -->
 <div id="boss-hud">
@@ -864,6 +911,19 @@
         },
         bossSpawn() {
             this.playTone(90, 45, 'sawtooth', 0.8, 0.4);
+        },
+        heal() {
+            [523, 659, 784, 1046].forEach((f, i) => {
+                setTimeout(() => this.playTone(f, f * 1.05, 'triangle', 0.15, 0.22), i * 60);
+            });
+        },
+        invincible() {
+            [440, 554, 659, 880, 1108].forEach((f, i) => {
+                setTimeout(() => this.playTone(f, f * 1.1, 'sine', 0.2, 0.26), i * 70);
+            });
+        },
+        speedBuff() {
+            this.playTone(280, 950, 'sawtooth', 0.35, 0.22);
         }
     };
 
@@ -919,11 +979,13 @@
     let projectiles = [];
     let gems = [];
     let particles = [];
+    let pickups = [];
     let activeBoss = null;
 
     let score = 0;
     let gameTimer = 0;
     let spawnTimer = 0;
+    let pickupSpawnTimer = 0;
     let isGameRunning = false;
     let isPaused = false;
     let bossSpawned = false;
@@ -948,6 +1010,7 @@
         bossBar: document.getElementById('boss-bar'),
         inventory: document.getElementById('inventory-hud'),
         damageOverlay: document.getElementById('damage-overlay'),
+        buffsBar: document.getElementById('active-buffs-bar'),
         startModal: document.getElementById('start-modal'),
         pauseModal: document.getElementById('pause-modal'),
         upgradeModal: document.getElementById('upgrade-modal'),
@@ -1120,6 +1183,10 @@
             this.hpRegen = 0;
             this.regenTimer = 0;
 
+            // Power-up Modifiers
+            this.invincibleTimer = 0;
+            this.speedBoostTimer = 0;
+
             // Active Weapon Loadout (Max 4)
             this.weapons = [];
             this.relics = new Map(); // id -> level
@@ -1200,6 +1267,21 @@
                 this.mesh.add(hat, brim);
             }
 
+            // Golden Invincibility Bubble
+            const shieldGeo = new THREE.SphereGeometry(10.5, 16, 16);
+            const shieldMat = new THREE.MeshStandardMaterial({
+                color: 0xffd166,
+                emissive: 0xffd166,
+                emissiveIntensity: 0.8,
+                transparent: true,
+                opacity: 0.45,
+                roughness: 0.2
+            });
+            this.shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+            this.shieldMesh.position.y = 8;
+            this.shieldMesh.visible = false;
+            this.mesh.add(this.shieldMesh);
+
             // Weapon mount node
             this.weaponMount = new THREE.Group();
             this.weaponMount.position.set(5.5, 6.5, 3);
@@ -1251,10 +1333,43 @@
                 if (keys.d) moveVec.x += 1;
             }
 
+            // Calculate movement speed with active buffs (+150% speed buff = 2.5x base speed!)
+            let effectiveSpeed = this.speed;
+            if (this.speedBoostTimer > 0) {
+                this.speedBoostTimer -= dt;
+                effectiveSpeed *= 2.5;
+                if (moveVec.lengthSq() > 0.01 && Math.random() < 0.4) {
+                    createSparks(this.mesh.position.x, this.mesh.position.z, 0x00f5ff, 2);
+                }
+            }
+
+            // Invincibility shield & ramming
+            if (this.invincibleTimer > 0) {
+                this.invincibleTimer -= dt;
+                if (this.shieldMesh) {
+                    this.shieldMesh.visible = true;
+                    this.shieldMesh.rotation.y += dt * 6;
+                    this.shieldMesh.rotation.x += dt * 3;
+                }
+                // Ramming damage to surrounding enemies!
+                enemies.forEach(e => {
+                    if (!e.dead) {
+                        const dx = this.mesh.position.x - e.mesh.position.x;
+                        const dz = this.mesh.position.z - e.mesh.position.z;
+                        if (Math.hypot(dx, dz) < 14) {
+                            e.takeDamage(45, true);
+                            createSparks(e.mesh.position.x, e.mesh.position.z, 0xffd166, 4);
+                        }
+                    }
+                });
+            } else {
+                if (this.shieldMesh) this.shieldMesh.visible = false;
+            }
+
             const isMoving = moveVec.lengthSq() > 0.01;
             if (isMoving) {
                 moveVec.normalize();
-                this.mesh.position.addScaledVector(moveVec, this.speed * dt);
+                this.mesh.position.addScaledVector(moveVec, effectiveSpeed * dt);
                 this.facingDir.copy(moveVec);
 
                 // Cute cartoon walk bobbing
@@ -1324,6 +1439,11 @@
         }
 
         takeDamage(amount) {
+            if (this.invincibleTimer > 0) {
+                // Completely deflect damage!
+                createSparks(this.mesh.position.x, this.mesh.position.z, 0xffd166, 2);
+                return;
+            }
             this.hp = Math.max(0, this.hp - amount);
             AudioEngine.hit();
             triggerDamageFlash();
@@ -1340,7 +1460,13 @@
         }
 
         heal(amount) {
+            const before = this.hp;
             this.hp = Math.min(this.maxHp, this.hp + amount);
+            const gained = Math.round(this.hp - before);
+            if (gained > 0) {
+                spawnDamageNumber(this.mesh.position, `+${gained} HP ❤️`, false, '#ff477e');
+                createSparks(this.mesh.position.x, this.mesh.position.z, 0xff477e, 8);
+            }
         }
 
         gainXp(amount) {
@@ -1999,14 +2125,23 @@
             // Drop XP gem
             gems.push(new XpGem(this.mesh.position, this.xpValue));
 
+            // Field Pickup Drop Chances:
             if (this.type === 'boss') {
                 dom.bossHud.style.display = 'none';
                 activeBoss = null;
-                // Boss drops 3 giant gems!
+                // Boss drops 3 giant gems, guaranteed Heart, and Power-Up!
                 for (let i = 0; i < 3; i++) {
                     gems.push(new XpGem(this.mesh.position.clone().add(new THREE.Vector3((i - 1) * 10, 0, 0)), 150));
                 }
+                pickups.push(new FieldPickup(this.mesh.position.clone().add(new THREE.Vector3(-12, 0, 0)), 'heart'));
+                pickups.push(new FieldPickup(this.mesh.position.clone().add(new THREE.Vector3(12, 0, 0)), Math.random() < 0.5 ? 'invincible' : 'speed'));
                 triggerLevelUp();
+            } else if (Math.random() < 0.08) {
+                // 8% chance from regular enemies to drop a Heart (10-25 HP)
+                pickups.push(new FieldPickup(this.mesh.position, 'heart'));
+            } else if (Math.random() < 0.025) {
+                // 2.5% chance to drop Invincible or Speed
+                pickups.push(new FieldPickup(this.mesh.position, Math.random() < 0.5 ? 'invincible' : 'speed'));
             }
         }
     }
@@ -2047,6 +2182,138 @@
                     this.destroy();
                 }
             }
+        }
+
+        destroy() {
+            this.dead = true;
+            scene.remove(this.mesh);
+        }
+    }
+
+    // =============================================
+    //  FIELD PICKUPS & POWER-UPS
+    //  - Hearts: 10 to 25 HP heal
+    //  - Invincibility: 5s invulnerability + shield
+    //  - Speed Buff: +150% speed for 15s
+    // =============================================
+    class FieldPickup {
+        constructor(pos, type = 'heart') {
+            this.pos = pos.clone();
+            this.pos.y = 3.5;
+            this.type = type; // 'heart' | 'invincible' | 'speed'
+            this.dead = false;
+            this.lifetime = 45.0;
+            this.bobTime = Math.random() * 10;
+            this.mesh = new THREE.Group();
+
+            if (this.type === 'heart') {
+                // 10 to 25 Health randomly
+                this.healValue = Math.floor(10 + Math.random() * 16);
+
+                const heartMat = new THREE.MeshStandardMaterial({
+                    color: 0xff3366,
+                    emissive: 0xff0055,
+                    emissiveIntensity: 0.7,
+                    roughness: 0.25
+                });
+                const lobeL = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 12), heartMat);
+                lobeL.position.set(-1.1, 1.2, 0);
+                const lobeR = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 12), heartMat);
+                lobeR.position.set(1.1, 1.2, 0);
+                const tip = new THREE.Mesh(new THREE.ConeGeometry(2.4, 3.2, 12), heartMat);
+                tip.position.set(0, -0.4, 0);
+                tip.rotation.z = Math.PI;
+
+                this.mesh.add(lobeL, lobeR, tip);
+            } else if (this.type === 'invincible') {
+                // Golden Star / Shield
+                const starMat = new THREE.MeshStandardMaterial({
+                    color: 0xffd166,
+                    emissive: 0xffaa00,
+                    emissiveIntensity: 0.9,
+                    roughness: 0.2
+                });
+                const star = new THREE.Mesh(new THREE.OctahedronGeometry(3.2, 0), starMat);
+                const ring = new THREE.Mesh(
+                    new THREE.TorusGeometry(4.4, 0.5, 8, 20),
+                    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffd166, emissiveIntensity: 0.7 })
+                );
+                ring.rotation.x = Math.PI / 2;
+                this.mesh.add(star, ring);
+            } else if (this.type === 'speed') {
+                // Electric Cyan Lightning Diamond
+                const speedMat = new THREE.MeshStandardMaterial({
+                    color: 0x00f5ff,
+                    emissive: 0x00d2d3,
+                    emissiveIntensity: 0.9,
+                    roughness: 0.1
+                });
+                const bolt = new THREE.Mesh(new THREE.DodecahedronGeometry(2.8, 0), speedMat);
+                const halo = new THREE.Mesh(
+                    new THREE.TorusGeometry(3.8, 0.4, 8, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x06d6a0, emissive: 0x06d6a0, emissiveIntensity: 0.8 })
+                );
+                halo.rotation.x = Math.PI / 3;
+                this.mesh.add(bolt, halo);
+            }
+
+            this.mesh.position.copy(this.pos);
+            scene.add(this.mesh);
+        }
+
+        update(dt) {
+            if (!player) return;
+            this.lifetime -= dt;
+            this.bobTime += dt * 4;
+
+            // Bobbing & 3D rotation
+            this.mesh.position.y = 3.5 + Math.sin(this.bobTime) * 1.2;
+            this.mesh.rotation.y += dt * 3.2;
+
+            // Suction if within player magnet radius
+            const dx = player.mesh.position.x - this.pos.x;
+            const dz = player.mesh.position.z - this.pos.z;
+            const distXZ = Math.hypot(dx, dz);
+
+            if (distXZ < player.magnetRadius) {
+                const pullSpeed = Math.max(130, (player.magnetRadius - distXZ) * 14);
+                const toPlayer = new THREE.Vector3(dx, 0, dz).normalize();
+                this.pos.addScaledVector(toPlayer, pullSpeed * dt);
+                this.mesh.position.x = this.pos.x;
+                this.mesh.position.z = this.pos.z;
+            }
+
+            // Collection check (generous 10-unit touch radius)
+            if (distXZ < 10) {
+                this.collect();
+            }
+
+            if (this.lifetime <= 0) {
+                this.destroy();
+            }
+        }
+
+        collect() {
+            if (this.dead) return;
+            this.dead = true;
+
+            if (this.type === 'heart') {
+                player.heal(this.healValue);
+                AudioEngine.heal();
+                createSparks(this.pos.x, this.pos.z, 0xff477e, 14);
+            } else if (this.type === 'invincible') {
+                player.invincibleTimer = 5.0; // 5 full seconds
+                spawnDamageNumber(player.mesh.position, '⭐ INVINCIBLE 5s!', false, '#ffd166');
+                AudioEngine.invincible();
+                createSparks(this.pos.x, this.pos.z, 0xffd166, 18);
+            } else if (this.type === 'speed') {
+                player.speedBoostTimer = 15.0; // 15 full seconds (+150% speed)
+                spawnDamageNumber(player.mesh.position, '⚡ SPEED +150% 15s!', false, '#00f5ff');
+                AudioEngine.speedBuff();
+                createSparks(this.pos.x, this.pos.z, 0x00f5ff, 18);
+            }
+
+            this.destroy();
         }
 
         destroy() {
@@ -2451,11 +2718,14 @@
         projectiles.forEach(p => scene.remove(p.mesh));
         gems.forEach(g => scene.remove(g.mesh));
         particles.forEach(p => scene.remove(p.mesh));
+        pickups.forEach(p => scene.remove(p.mesh));
 
         enemies = [];
         projectiles = [];
         gems = [];
         particles = [];
+        pickups = [];
+        pickupSpawnTimer = 0;
         activeBoss = null;
 
         score = 0;
@@ -2471,6 +2741,11 @@
         // Spawn Hero
         player = new Hero(selectedCharKey);
         updateInventoryHUD();
+
+        // Spawn starter pickups on field for immediate action
+        pickups.push(new FieldPickup(new THREE.Vector3(25, 0, 15), 'heart'));
+        pickups.push(new FieldPickup(new THREE.Vector3(-30, 0, 20), 'speed'));
+        pickups.push(new FieldPickup(new THREE.Vector3(0, 0, -35), 'invincible'));
 
         isGameRunning = true;
         isPaused = false;
@@ -2509,6 +2784,21 @@
             gameTimer += dt;
             spawnTimer += dt;
 
+            // Periodic Field Pickup Spawning (every 11s)
+            pickupSpawnTimer += dt;
+            if (pickupSpawnTimer >= 11.0) {
+                pickupSpawnTimer = 0;
+                const angle = Math.random() * Math.PI * 2;
+                const r = 25 + Math.random() * 165;
+                const pos = new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+                const roll = Math.random();
+                let pType = 'heart';
+                if (roll < 0.60) pType = 'heart';
+                else if (roll < 0.80) pType = 'invincible';
+                else pType = 'speed';
+                pickups.push(new FieldPickup(pos, pType));
+            }
+
             // Update 3D Raycasting ground coordinate
             if (mousePos.active) {
                 raycaster.setFromCamera(mousePos, camera);
@@ -2545,6 +2835,13 @@
                 if (g.dead) gems.splice(i, 1);
             }
 
+            // Update Pickups (Hearts, Invincible, Speed)
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const pk = pickups[i];
+                pk.update(dt);
+                if (pk.dead) pickups.splice(i, 1);
+            }
+
             // Update Particles
             updateParticles(dt);
 
@@ -2555,11 +2852,26 @@
             camera.position.z += (targetZ + 50 - camera.position.z) * 0.08;
             camera.lookAt(targetX, 0, player.mesh.position.z - 10);
 
-            // Update HUD
+            // Update Active Buffs Bar & Top HUD
+            updateBuffsHUD();
             updateHUDDisplay();
         }
 
         renderer.render(scene, camera);
+    }
+
+    function updateBuffsHUD() {
+        if (!dom.buffsBar) return;
+        let html = '';
+        if (player && player.invincibleTimer > 0) {
+            const s = Math.ceil(player.invincibleTimer);
+            html += `<div class="buff-badge invincible">⭐ INVINCIBLE ${s}s</div>`;
+        }
+        if (player && player.speedBoostTimer > 0) {
+            const s = Math.ceil(player.speedBoostTimer);
+            html += `<div class="buff-badge speed">⚡ SPEED +150% ${s}s</div>`;
+        }
+        dom.buffsBar.innerHTML = html;
     }
 
     function handleEnemySpawning(dt) {
