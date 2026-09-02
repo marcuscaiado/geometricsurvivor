@@ -8,7 +8,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>MEGABONK 3D :: Cute Cartoon Survivor v1.3</title>
+    <title>MEGABONK 3D :: Cute Cartoon Survivor v1.4</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -663,7 +663,7 @@
 
     <!-- Center: Stats & Auto-Aim -->
     <div class="hud-stats-card">
-        <span style="font-size: 10px; font-weight: 900; color: #06d6a0; background: rgba(6, 214, 160, 0.15); padding: 2px 6px; border-radius: 6px;">v1.3</span>
+        <span style="font-size: 10px; font-weight: 900; color: #06d6a0; background: rgba(6, 214, 160, 0.15); padding: 2px 6px; border-radius: 6px;">v1.4</span>
         <div class="stat-item">
             <span class="stat-icon">⏱️</span>
             <span id="timer-text">00:00</span>
@@ -1553,7 +1553,7 @@
             for (let i = 0; i < count; i++) {
                 const angle = startAngle + i * spread;
                 const dir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-                const origin = this.hero.mesh.position.clone().add(new THREE.Vector3(0, 8, 0));
+                const origin = this.hero.mesh.position.clone().add(new THREE.Vector3(0, 4.5, 0));
                 projectiles.push(new SparkProjectile(origin, dir, 165, Math.round(this.baseDamage * this.hero.dmgMultiplier), this.hero.critChance));
             }
         }
@@ -1604,13 +1604,16 @@
                 star.position.set(Math.cos(a) * this.radius, 0, Math.sin(a) * this.radius);
                 star.rotation.y += dt * 6;
 
-                // Collision with enemies
+                // Collision with enemies (2D Ground XZ plane)
                 const worldPos = new THREE.Vector3();
                 star.getWorldPosition(worldPos);
 
                 enemies.forEach(e => {
                     if (e.dead) return;
-                    if (e.mesh.position.distanceTo(worldPos) < 10) {
+                    const dx = worldPos.x - e.mesh.position.x;
+                    const dz = worldPos.z - e.mesh.position.z;
+                    const distXZ = Math.hypot(dx, dz);
+                    if (distXZ < e.hitRadius + 5.5) {
                         e.takeDamage(Math.round(this.damage * this.hero.dmgMultiplier * dt * 4.5), false);
                         createSparks(worldPos.x, worldPos.z, 0xffd166, 1);
                     }
@@ -1684,19 +1687,24 @@
             this.pos.addScaledVector(this.dir, this.speed * dt);
             this.mesh.position.copy(this.pos);
 
-            // Enemy hit test (easy to hit multiple in line!)
+            // Enemy hit test (2D Ground XZ plane)
             for (let i = 0; i < enemies.length; i++) {
                 const e = enemies[i];
-                if (!e.dead && !this.hitEnemies.has(e) && this.pos.distanceTo(e.mesh.position) < e.hitRadius + 3) {
-                    this.hitEnemies.add(e);
-                    const isCrit = Math.random() < this.critChance;
-                    e.takeDamage(isCrit ? Math.round(this.damage * 2.2) : this.damage, isCrit);
-                    createSparks(this.pos.x, this.pos.z, 0x06d6a0, 4);
+                if (!e.dead && !this.hitEnemies.has(e)) {
+                    const dx = this.pos.x - e.mesh.position.x;
+                    const dz = this.pos.z - e.mesh.position.z;
+                    const distXZ = Math.hypot(dx, dz);
+                    if (distXZ < e.hitRadius + 4.5) {
+                        this.hitEnemies.add(e);
+                        const isCrit = Math.random() < this.critChance;
+                        e.takeDamage(isCrit ? Math.round(this.damage * 2.2) : this.damage, isCrit);
+                        createSparks(this.pos.x, this.pos.z, 0x06d6a0, 4);
 
-                    this.pierce--;
-                    if (this.pierce <= 0) {
-                        this.destroy();
-                        break;
+                        this.pierce--;
+                        if (this.pierce <= 0) {
+                            this.destroy();
+                            break;
+                        }
                     }
                 }
             }
@@ -1736,17 +1744,23 @@
             this.mesh.rotation.x += dt * 8;
             this.mesh.rotation.y += dt * 8;
 
+            // Enemy hit test (2D Ground XZ plane: guarantees hitting imps/cones!)
             for (let i = 0; i < enemies.length; i++) {
                 const e = enemies[i];
-                if (!e.dead && !this.hitEnemies.has(e) && this.pos.distanceTo(e.mesh.position) < e.hitRadius + 3.5) {
-                    this.hitEnemies.add(e);
-                    const isCrit = Math.random() < this.critChance;
-                    e.takeDamage(isCrit ? Math.round(this.damage * 2.2) : this.damage, isCrit);
-                    createSparks(this.pos.x, this.pos.z, 0x00f5ff, 5);
-                    this.pierceCount--;
-                    if (this.pierceCount <= 0) {
-                        this.destroy();
-                        return;
+                if (!e.dead && !this.hitEnemies.has(e)) {
+                    const dx = this.pos.x - e.mesh.position.x;
+                    const dz = this.pos.z - e.mesh.position.z;
+                    const distXZ = Math.hypot(dx, dz);
+                    if (distXZ < e.hitRadius + 5.0) {
+                        this.hitEnemies.add(e);
+                        const isCrit = Math.random() < this.critChance;
+                        e.takeDamage(isCrit ? Math.round(this.damage * 2.2) : this.damage, isCrit);
+                        createSparks(this.pos.x, this.pos.z, 0x00f5ff, 5);
+                        this.pierceCount--;
+                        if (this.pierceCount <= 0) {
+                            this.destroy();
+                            return;
+                        }
                     }
                 }
             }
@@ -1799,10 +1813,15 @@
             this.mesh.rotation.z += dt * 16;
 
             enemies.forEach(e => {
-                if (!e.dead && this.pos.distanceTo(e.mesh.position) < e.hitRadius + 5) {
-                    const isCrit = Math.random() < this.critChance;
-                    e.takeDamage(isCrit ? Math.round(this.damage * 2.2) : this.damage, isCrit);
-                    createSparks(this.pos.x, this.pos.z, 0xe74c3c, 6);
+                if (!e.dead && this.pos.y < 16) {
+                    const dx = this.pos.x - e.mesh.position.x;
+                    const dz = this.pos.z - e.mesh.position.z;
+                    const distXZ = Math.hypot(dx, dz);
+                    if (distXZ < e.hitRadius + 6.0) {
+                        const isCrit = Math.random() < this.critChance;
+                        e.takeDamage(isCrit ? Math.round(this.damage * 2.2) : this.damage, isCrit);
+                        createSparks(this.pos.x, this.pos.z, 0xe74c3c, 6);
+                    }
                 }
             });
         }
