@@ -15,6 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
 
     <script src="arcade-sound-engine.js"></script>
+  <script src="arcade-difficulty.js"></script>
   <script src="arcade-leaderboard.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
@@ -2890,6 +2891,7 @@
         pickupSpawnTimer = 0;
         activeBoss = null;
 
+        if (window.ArcadeDifficulty) ArcadeDifficulty.reset();
         score = 0;
         gameTimer = 0;
         spawnTimer = 0;
@@ -3037,16 +3039,17 @@
     }
 
     function handleEnemySpawning(dt) {
-        // FAST & INTENSE SWARMS (Option 1 selected):
-        // Spawn delay starts at 0.65s and drops down to 0.20s by minute 1
-        const spawnDelay = Math.max(0.20, 0.65 - (gameTimer / 60) * 0.45);
+        // FAST & INTENSE SWARMS WITH DDA:
+        const currentKills = (player && player.kills) || 0;
+        const spawnDelay = window.ArcadeDifficulty ? ArcadeDifficulty.scaleInterval(650, currentKills, 350, 200, 2.0) / 1000 : Math.max(0.20, 0.65 - (gameTimer / 60) * 0.45);
 
         if (spawnTimer >= spawnDelay) {
             spawnTimer = 0;
             const difficulty = 1 + Math.floor(gameTimer / 25);
 
             // Spawn in surrounding packs (2 to 4 enemies at once)
-            const packSize = gameTimer < 20 ? 2 : (gameTimer < 45 ? 3 : 4);
+            const basePack = gameTimer < 20 ? 2 : (gameTimer < 45 ? 3 : 4);
+            const packSize = window.ArcadeDifficulty ? ArcadeDifficulty.scaleCount(basePack, currentKills, 350, 6) : basePack;
             for (let p = 0; p < packSize; p++) {
                 let type = 'slime';
                 const roll = Math.random();
