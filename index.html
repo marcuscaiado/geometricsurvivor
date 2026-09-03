@@ -696,7 +696,16 @@
             .game-title { font-size: 2rem; }
             #inventory-hud { bottom: 155px; left: 16px; }
         }
-    </style>
+    
+/* Universal Mobile Touch & Top Navigation Safeguards */
+.arcade-nav, .arcade-link, .nav-btn-arcade, .arcade-corner-btn, .arcade-btn, .btn-arcade, a[href*="arcad"], #modal a, #modal button, .modal a, .modal button, #game-over-modal a, #game-over-modal button {
+  pointer-events: auto !important;
+  touch-action: auto !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: rgba(0, 245, 255, 0.4);
+}
+
+</style>
 </head>
 <body>
 
@@ -761,7 +770,7 @@
             <span>👤</span>
             <span class="btn-text">HERO</span>
         </button>
-        <a id="btn-quick-arcade" class="hud-action-btn arcade-link" href="https://marcuscaiado.github.io/marcus-arcade/" title="Arcade Hub">
+        <a id="btn-quick-arcade" class="hud-action-btn arcade-link" href="https://marcuscaiado.github.io/marcus-arcade/" title="Arcade Hub" target="_top" onclick="if(window.top){window.top.location.href=this.href;return false;}" ontouchend="if(window.top){window.top.location.href=this.href;return false;}">
             <span>🕹️</span>
             <span class="btn-text">ARCADE</span>
         </a>
@@ -858,7 +867,7 @@
             <div style="display: flex; gap: 10px;">
                 <button id="btn-pause-restart" class="btn-secondary" style="flex: 1;">🔄 RESTART</button>
                 <button id="btn-pause-hero" class="btn-secondary" style="flex: 1;">👤 CHANGE HERO</button>
-                <a href="https://marcuscaiado.github.io/marcus-arcade/" class="btn-secondary" style="flex: 1; text-decoration: none; display:flex; align-items:center; justify-content:center;">🕹️ ARCADE</a>
+                <a href="https://marcuscaiado.github.io/marcus-arcade/" class="btn-secondary" style="flex: 1; text-decoration: none; display:flex; align-items:center; justify-content:center;" target="_top" onclick="if(window.top){window.top.location.href=this.href;return false;}" ontouchend="if(window.top){window.top.location.href=this.href;return false;}">🕹️ ARCADE</a>
             </div>
         </div>
     </div>
@@ -884,7 +893,7 @@
             <button id="btn-restart" class="btn-primary">⚡ RETRY (SAME HERO)</button>
             <div style="display: flex; gap: 10px;">
                 <button id="btn-gameover-hero" class="btn-secondary" style="flex: 1;">👤 CHANGE HERO</button>
-                <a href="https://marcuscaiado.github.io/marcus-arcade/" class="btn-secondary" style="flex: 1; text-decoration: none; display:flex; align-items:center; justify-content:center;">🕹️ ARCADE HUB</a>
+                <a href="https://marcuscaiado.github.io/marcus-arcade/" class="btn-secondary" style="flex: 1; text-decoration: none; display:flex; align-items:center; justify-content:center;" target="_top" onclick="if(window.top){window.top.location.href=this.href;return false;}" ontouchend="if(window.top){window.top.location.href=this.href;return false;}">🕹️ ARCADE HUB</a>
             </div>
         </div>
     </div>
